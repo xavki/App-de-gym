@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema base oscuro para splash y barras del sistema -->
+    <style name="Theme.GymFlow" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- ═══ Strings ES (idioma por defecto) ═══ -->
+    <string name="app_name">GymFlow</string>
+    <string name="app_tagline">Tu entrenamiento, tu ritmo</string>
+
+    <!-- Login -->
+    <string name="login_title">GymFlow</string>
+    <string name="login_tab_enter">Entrar</string>
+    <string name="login_tab_register">Registro</string>
+    <string name="login_full_name">Nombre Completo</string>
+    <string name="login_email">Email</string>
+    <string name="login_password">Contraseña</string>
+    <string name="login_remember">Recordar sesión</string>
+    <string name="login_loading">CARGANDO…</string>
+    <string name="login_create_account">CREAR CUENTA</string>
+    <string name="login_enter">ENTRAR</string>
+    <string name="login_or">o</string>
+    <string name="login_google">ENTRAR CON GOOGLE</string>
+
+    <!-- Bottom nav -->
+    <string name="nav_calendar">Calendario</string>
+    <string name="nav_routines">Rutinas</string>
+    <string name="nav_profile">Perfil</string>
+
+    <!-- Routines tab -->
+    <string name="routines_active">⚡ ACTIVO</string>
+    <string name="routines_duration">DURACIÓN</string>
+    <string name="routines_my_routines">MIS RUTINAS</string>
+    <string name="routines_exercises_count">%d ejercicios</string>
+    <string name="routines_empty_title">Crea tu primera rutina</string>
+    <string name="routines_empty_subtitle">Pulsa + para empezar</string>
+
+    <!-- Workout -->
+    <string name="workout_finish">FINALIZAR</string>
+    <string name="workout_exercise_of">Ejercicio %1$d de %2$d</string>
+    <string name="workout_sets">SERIES</string>
+    <string name="workout_sessions">SESIONES</string>
+    <string name="workout_add">AÑADIR</string>
+    <string name="workout_add_note">Añadir nota… (ej: subir peso)</string>
+    <string name="workout_previous">ANTERIOR</string>
+    <string name="workout_next">SIGUIENTE</string>
+    <string name="workout_end">TERMINAR</string>
+    <string name="workout_kg">KG</string>
+    <string name="workout_reps">REPS</string>
+    <string name="workout_time">TIEMPO</string>
+
+    <!-- Rest timer -->
+    <string name="rest_title">Descanso</string>
+    <string name="rest_reset">Reiniciar a 1:00</string>
+    <string name="rest_close">Cerrar</string>
+
+    <!-- Summary -->
+    <string name="summary_great_job">¡Buen trabajo!</string>
+    <string name="summary_duration">Duración</string>
+    <string name="summary_total_kg">Kg totales</string>
+    <string name="summary_sets">Series</string>
+    <string name="summary_exercises">Ejercicios</string>
+    <string name="summary_best_set">MEJOR SERIE</string>
+    <string name="summary_breakdown">DESGLOSE</string>
+    <string name="summary_set_n">Serie %d</string>
+    <string name="summary_back_home">VOLVER AL INICIO</string>
+
+    <!-- Exercise selection -->
+    <string name="exercises_add_title">Añadir Ejercicios</string>
+    <string name="exercises_done">LISTO</string>
+    <string name="exercises_search">Buscar ejercicio…</string>
+    <string name="exercises_filters">FILTROS</string>
+    <string name="exercises_clear">Limpiar</string>
+
+    <!-- Filter groups -->
+    <string name="filter_type">💪 Tipo</string>
+    <string name="filter_upper">🔝 Tren superior</string>
+    <string name="filter_lower">🦵 Tren inferior</string>
+    <string name="filter_core">🎯 Core</string>
+
+    <!-- Filter categories (traducidas) -->
+    <string name="cat_cardio">Cardio</string>
+    <string name="cat_strength">Fuerza</string>
+    <string name="cat_abs">Abdominales</string>
+    <string name="cat_abductors">Abductores</string>
+    <string name="cat_adductors">Aductores</string>
+    <string name="cat_forearm">Antebrazo</string>
+    <string name="cat_biceps">Bíceps</string>
+    <string name="cat_neck">Cuello</string>
+    <string name="cat_quads">Cuádriceps</string>
+    <string name="cat_lats">Dorsales</string>
+    <string name="cat_lower_back">Espalda Baja</string>
+    <string name="cat_mid_back">Espalda Media</string>
+    <string name="cat_calves">Gemelos</string>
+    <string name="cat_glutes">Glúteos</string>
+    <string name="cat_shoulders">Hombros</string>
+    <string name="cat_hamstrings">Isquiotibiales</string>
+    <string name="cat_chest">Pecho</string>
+    <string name="cat_traps">Trapecios</string>
+    <string name="cat_triceps">Tríceps</string>
+
+    <!-- Edit routine -->
+    <string name="edit_routine_title">Editar Rutina</string>
+    <string name="new_routine_title">Nueva Rutina</string>
+    <string name="routine_name_label">Nombre de la rutina</string>
+    <string name="routine_exercises">EJERCICIOS</string>
+    <string name="routine_save">GUARDAR</string>
+    <string name="routine_reorder_hint">Mantén pulsado ↕ para reordenar</string>
+
+    <!-- Profile -->
+    <string name="profile_title">Mi Perfil</string>
+    <string name="profile_workouts">Entrenos</string>
+    <string name="profile_minutes">Minutos</string>
+    <string name="profile_total_sets">Series</string>
+    <string name="profile_history">Historial</string>
+    <string name="profile_no_history">Aún no has entrenado</string>
+    <string name="profile_logout">Cerrar sesión</string>
+
+    <!-- Routine detail -->
+    <string name="start_workout">INICIAR ENTRENAMIENTO</string>
+    <string name="continue_workout">CONTINUAR ENTRENAMIENTO</string>
+
+    <!-- Misc -->
+    <string name="copy_suffix">(copia)</string>
+</resources>

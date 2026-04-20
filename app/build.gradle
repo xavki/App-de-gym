@@ -1,0 +1,78 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'   // Compose compiler plugin (Kotlin 2.0+)
+    id 'com.google.gms.google-services'
+}
+
+android {
+    namespace 'com.gymflow'
+    compileSdk 35                               // ← actualizado (exigido por Compose 1.8+)
+
+    defaultConfig {
+        applicationId "com.gymflow"
+        minSdk 26
+        targetSdk 35                            // ← actualizado
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary true
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+    buildFeatures {
+        compose true
+    }
+    // composeOptions ya NO hace falta con Kotlin 2.0+ (el compilador viene en el plugin)
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.15.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.9.0'
+    implementation 'androidx.activity:activity-compose:1.10.1'
+
+    // Compose BOM alineado con las versiones que ya resuelve Gradle
+    implementation platform('androidx.compose:compose-bom:2025.04.01')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+
+    // Firebase
+    implementation platform('com.google.firebase:firebase-bom:33.1.0')
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.android.gms:play-services-auth:21.2.0'
+
+    // Credentials Manager
+    implementation "androidx.credentials:credentials:1.5.0"
+    implementation "androidx.credentials:credentials-play-services-auth:1.5.0"
+    implementation "com.google.android.libraries.identity.googleid:googleid:1.1.1"
+
+    // Room
+    implementation "androidx.room:room-runtime:2.6.1"
+    implementation "androidx.room:room-ktx:2.6.1"
+
+    // Gson
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Coil
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("io.coil-kt:coil-gif:2.6.0")
+}

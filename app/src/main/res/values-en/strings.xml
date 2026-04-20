@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ═══ English Strings ═══ -->
+    <string name="app_name">GymFlow</string>
+    <string name="app_tagline">Your workout, your pace</string>
+
+    <!-- Login -->
+    <string name="login_title">GymFlow</string>
+    <string name="login_tab_enter">Log In</string>
+    <string name="login_tab_register">Sign Up</string>
+    <string name="login_full_name">Full Name</string>
+    <string name="login_email">Email</string>
+    <string name="login_password">Password</string>
+    <string name="login_remember">Remember me</string>
+    <string name="login_loading">LOADING…</string>
+    <string name="login_create_account">CREATE ACCOUNT</string>
+    <string name="login_enter">LOG IN</string>
+    <string name="login_or">or</string>
+    <string name="login_google">LOG IN WITH GOOGLE</string>
+
+    <!-- Bottom nav -->
+    <string name="nav_calendar">Calendar</string>
+    <string name="nav_routines">Routines</string>
+    <string name="nav_profile">Profile</string>
+
+    <!-- Routines tab -->
+    <string name="routines_active">⚡ ACTIVE</string>
+    <string name="routines_duration">DURATION</string>
+    <string name="routines_my_routines">MY ROUTINES</string>
+    <string name="routines_exercises_count">%d exercises</string>
+    <string name="routines_empty_title">Create your first routine</string>
+    <string name="routines_empty_subtitle">Tap + to start</string>
+
+    <!-- Workout -->
+    <string name="workout_finish">FINISH</string>
+    <string name="workout_exercise_of">Exercise %1$d of %2$d</string>
+    <string name="workout_sets">SETS</string>
+    <string name="workout_sessions">SESSIONS</string>
+    <string name="workout_add">ADD</string>
+    <string name="workout_add_note">Add note… (e.g. increase weight)</string>
+    <string name="workout_previous">PREVIOUS</string>
+    <string name="workout_next">NEXT</string>
+    <string name="workout_end">FINISH</string>
+    <string name="workout_kg">KG</string>
+    <string name="workout_reps">REPS</string>
+    <string name="workout_time">TIME</string>
+
+    <!-- Rest timer -->
+    <string name="rest_title">Rest</string>
+    <string name="rest_reset">Reset to 1:00</string>
+    <string name="rest_close">Close</string>
+
+    <!-- Summary -->
+    <string name="summary_great_job">Great work!</string>
+    <string name="summary_duration">Duration</string>
+    <string name="summary_total_kg">Total Kg</string>
+    <string name="summary_sets">Sets</string>
+    <string name="summary_exercises">Exercises</string>
+    <string name="summary_best_set">BEST SET</string>
+    <string name="summary_breakdown">BREAKDOWN</string>
+    <string name="summary_set_n">Set %d</string>
+    <string name="summary_back_home">BACK TO HOME</string>
+
+    <!-- Exercise selection -->
+    <string name="exercises_add_title">Add Exercises</string>
+    <string name="exercises_done">DONE</string>
+    <string name="exercises_search">Search exercise…</string>
+    <string name="exercises_filters">FILTERS</string>
+    <string name="exercises_clear">Clear</string>
+
+    <!-- Filter groups -->
+    <string name="filter_type">💪 Type</string>
+    <string name="filter_upper">🔝 Upper body</string>
+    <string name="filter_lower">🦵 Lower body</string>
+    <string name="filter_core">🎯 Core</string>
+
+    <!-- Filter categories -->
+    <string name="cat_cardio">Cardio</string>
+    <string name="cat_strength">Strength</string>
+    <string name="cat_abs">Abs</string>
+    <string name="cat_abductors">Abductors</string>
+    <string name="cat_adductors">Adductors</string>
+    <string name="cat_forearm">Forearms</string>
+    <string name="cat_biceps">Biceps</string>
+    <string name="cat_neck">Neck</string>
+    <string name="cat_quads">Quads</string>
+    <string name="cat_lats">Lats</string>
+    <string name="cat_lower_back">Lower Back</string>
+    <string name="cat_mid_back">Mid Back</string>
+    <string name="cat_calves">Calves</string>
+    <string name="cat_glutes">Glutes</string>
+    <string name="cat_shoulders">Shoulders</string>
+    <string name="cat_hamstrings">Hamstrings</string>
+    <string name="cat_chest">Chest</string>
+    <string name="cat_traps">Traps</string>
+    <string name="cat_triceps">Triceps</string>
+
+    <!-- Edit routine -->
+    <string name="edit_routine_title">Edit Routine</string>
+    <string name="new_routine_title">New Routine</string>
+    <string name="routine_name_label">Routine name</string>
+    <string name="routine_exercises">EXERCISES</string>
+    <string name="routine_save">SAVE</string>
+    <string name="routine_reorder_hint">Hold ↕ to reorder</string>
+
+    <!-- Profile -->
+    <string name="profile_title">My Profile</string>
+    <string name="profile_workouts">Workouts</string>
+    <string name="profile_minutes">Minutes</string>
+    <string name="profile_total_sets">Sets</string>
+    <string name="profile_history">History</string>
+    <string name="profile_no_history">No workouts yet</string>
+    <string name="profile_logout">Log out</string>
+
+    <!-- Routine detail -->
+    <string name="start_workout">START WORKOUT</string>
+    <string name="continue_workout">CONTINUE WORKOUT</string>
+
+    <!-- Misc -->
+    <string name="copy_suffix">(copy)</string>
+</resources>

@@ -1,0 +1,902 @@
+[
+  {
+    "name": "Press de banca con mancuernas",
+    "mainGroup": "Pecho",
+    "musclesUsed": "Pecho, tríceps, hombros",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas, Banco",
+    "isCustom": false,
+    "instructions": "Túmbate en un banco plano con una mancuerna en cada mano a la altura del pecho. Retrae las escápulas y mantén los pies firmes en el suelo. Con las palmas mirando hacia los pies, baja las mancuernas de forma controlada hasta que los codos queden ligeramente por debajo del banco, sintiendo el estiramiento en el pecho. Empuja explosivamente hacia arriba convergiendo las mancuernas ligeramente sin llegar a chocarlas, y sin bloquear los codos arriba."
+  },
+  {
+    "name": "Press inclinado con mancuernas",
+    "mainGroup": "Pecho",
+    "musclesUsed": "Pecho superior, hombros",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas, Banco",
+    "isCustom": false,
+    "instructions": "Ajusta el banco entre 30 y 45 grados. Siéntate con una mancuerna en cada mano apoyadas en los muslos y, al recostarte, llévalas a la altura del pecho superior. Retrae las escápulas, pies en el suelo. Baja las mancuernas de forma controlada hacia la parte superior del pecho y empuja hacia arriba y ligeramente hacia el centro. El ángulo de inclinación determina cuánto trabajas la clavícula del pectoral, evita pasarte de 45 grados para no cargar demasiado el hombro."
+  },
+  {
+    "name": "Aperturas con mancuernas",
+    "mainGroup": "Pecho",
+    "musclesUsed": "Pecho",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas, Banco",
+    "isCustom": false,
+    "instructions": "Túmbate en banco plano con una mancuerna en cada mano, brazos extendidos sobre el pecho y palmas enfrentadas. Abre los brazos hacia los lados describiendo un arco amplio, manteniendo una ligera flexión en los codos durante todo el movimiento para proteger la articulación. Baja hasta sentir un buen estiramiento en el pecho sin forzar el hombro, y vuelve al centro como si abrazaras un árbol grande. El movimiento debe ser fluido y controlado, no uses inercia."
+  },
+  {
+    "name": "Flexiones",
+    "mainGroup": "Pecho",
+    "musclesUsed": "Pecho, tríceps, core",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Colócate en posición de plancha alta con las manos a la anchura de los hombros o ligeramente más abiertas. Mantén el cuerpo completamente recto desde la cabeza hasta los talones activando el core. Baja el pecho hacia el suelo doblando los codos a unos 45 grados respecto al tronco, sin dejar caer la cadera ni elevarla. Cuando el pecho casi toque el suelo, empuja de vuelta a la posición inicial de forma explosiva. Respira al bajar y suelta el aire al subir."
+  },
+  {
+    "name": "Flexiones inclinadas",
+    "mainGroup": "Pecho",
+    "musclesUsed": "Pecho inferior",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal, Banco",
+    "isCustom": false,
+    "instructions": "Coloca las manos en un banco, silla o superficie elevada a la anchura de los hombros. Mantén el cuerpo recto y el core activo. Al tener las manos elevadas respecto a los pies, el vector de fuerza se dirige más hacia la parte inferior del pecho. Baja el pecho hacia la superficie controladamente y empuja hacia arriba. Cuanto más elevada esté la superficie, más fácil es el ejercicio, ideal para progresar hacia las flexiones normales."
+  },
+  {
+    "name": "Flexiones declinadas",
+    "mainGroup": "Pecho",
+    "musclesUsed": "Pecho superior",
+    "difficulty": "Intermedio",
+    "equipment": "Peso corporal, Banco",
+    "isCustom": false,
+    "instructions": "Apoya los pies en un banco o superficie elevada y las manos en el suelo a la anchura de los hombros. Al tener los pies más altos que las manos, el foco se traslada al pecho superior y la parte anterior del deltoides. Mantén el cuerpo recto y el core firme para evitar que la cadera caiga. Baja de forma controlada hasta que el pecho casi toque el suelo y empuja de vuelta. Cuanto más elevados estén los pies, mayor es la dificultad y la activación del pecho superior."
+  },
+  {
+    "name": "Press con banda",
+    "mainGroup": "Pecho",
+    "musclesUsed": "Pecho, tríceps",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Pasa la banda por detrás de la espalda y sujeta un extremo con cada mano. De pie o sentado, empieza con los codos flexionados a la altura del pecho y las palmas hacia adelante. Empuja ambas manos al frente de forma simultánea extendiendo los codos hasta casi bloquearlos, manteniendo el control en la vuelta. La banda aumenta la resistencia cuanto más la estiras, así que asegúrate de elegir una tensión que te permita hacer el movimiento completo con buena técnica."
+  },
+  {
+    "name": "Aperturas con banda",
+    "mainGroup": "Pecho",
+    "musclesUsed": "Pecho",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Ancla la banda a una altura media detrás de ti o pásala por la espalda. Sujeta un extremo con cada mano, brazos extendidos al frente y palmas enfrentadas. Abre los brazos hacia los lados manteniendo una leve flexión en los codos, como en las aperturas con mancuernas. Siente el estiramiento del pecho al abrir y contrae el pectoral al cerrar. Realiza el movimiento lento y controlado para maximizar la tensión muscular durante todo el rango."
+  },
+  {
+    "name": "Pullover con mancuerna",
+    "mainGroup": "Pecho",
+    "musclesUsed": "Pecho, dorsal",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuerna, Banco",
+    "isCustom": false,
+    "instructions": "Colócate transversalmente sobre un banco, con solo la parte superior de la espalda apoyada y los pies firmes en el suelo para mantener la cadera a la altura del banco. Sujeta una mancuerna con ambas manos por encima del pecho. Baja la mancuerna lentamente por detrás de la cabeza con los brazos casi rectos, sintiendo el estiramiento en el pecho y el dorsal. Vuelve al punto de partida usando la fuerza de ambos músculos. Evita bajar demasiado si sientes tensión en el hombro."
+  },
+  {
+    "name": "Press en banco plano",
+    "mainGroup": "Pecho",
+    "musclesUsed": "Pecho, tríceps",
+    "difficulty": "Intermedio",
+    "equipment": "Barra, Banco",
+    "isCustom": false,
+    "instructions": "Túmbate en el banco plano, retrae las escápulas y mantén los pies firmes en el suelo para mayor estabilidad. Sujeta la barra con un agarre ligeramente más ancho que los hombros, bájala de forma controlada hasta la parte inferior del pecho y empuja hacia arriba explosivamente sin bloquear los codos. Mantén los antebrazos verticales durante todo el movimiento y asegúrate de tener un spotter o usar un rack de seguridad cuando trabajes con cargas elevadas."
+  },
+  {
+    "name": "Remo con mancuerna",
+    "mainGroup": "Espalda",
+    "musclesUsed": "Dorsal, bíceps",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna, Banco",
+    "isCustom": false,
+    "instructions": "Apoya la rodilla y la mano del mismo lado en un banco para estabilizar el tronco. Con la espalda paralela al suelo y la columna neutra, sujeta la mancuerna con el brazo colgando. Tira de la mancuerna hacia la cadera retrayendo la escápula primero y luego flexionando el codo, manteniendo el codo pegado al cuerpo. Baja de forma controlada sintiendo el estiramiento del dorsal. Evita rotar el tronco para añadir impulso, el movimiento debe ser puro de espalda."
+  },
+  {
+    "name": "Remo con banda",
+    "mainGroup": "Espalda",
+    "musclesUsed": "Espalda media",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Pisa la banda con ambos pies a la anchura de las caderas e inclínate hacia adelante unos 45 grados manteniendo la espalda recta y las rodillas ligeramente flexionadas. Sujeta los extremos de la banda con cada mano, palmas enfrentadas. Tira de la banda hacia tu ombligo retrayendo las escápulas y apretando la espalda media al final del movimiento. Baja controladamente. Este ejercicio es excelente para trabajar el romboides y el trapecio medio sin equipamiento pesado."
+  },
+  {
+    "name": "Remo inclinado con mancuernas",
+    "mainGroup": "Espalda",
+    "musclesUsed": "Dorsales, trapecio",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "De pie con los pies a la anchura de los hombros, flexiona las caderas hasta que el torso quede a unos 45 grados, rodillas ligeramente dobladas y columna neutral. Cuelga las mancuernas frente a ti con los brazos extendidos. Retrae ambas escápulas simultáneamente y tira de las mancuernas hacia las caderas doblando los codos, apretando la espalda en la posición superior. Baja de forma lenta y controlada para maximizar el estiramiento del dorsal."
+  },
+  {
+    "name": "Peso muerto",
+    "mainGroup": "Espalda",
+    "musclesUsed": "Espalda baja, glúteos",
+    "difficulty": "Avanzado",
+    "equipment": "Barra",
+    "isCustom": false,
+    "instructions": "Colócate frente a la barra con los pies a la anchura de las caderas y la barra sobre la mitad del pie. Agáchate manteniendo la espalda completamente recta, pecho hacia adelante y escápulas retraídas. Sujeta la barra con agarre prono o mixto justo fuera de las rodillas. Empuja el suelo hacia abajo con los pies mientras extiendes caderas y rodillas simultáneamente, manteniendo la barra pegada al cuerpo en todo momento. Llega a la extensión completa apretando glúteos al final. Baja de forma controlada invirtiendo el movimiento."
+  },
+  {
+    "name": "Peso muerto rumano (Espalda)",
+    "mainGroup": "Espalda",
+    "musclesUsed": "Isquios, espalda baja",
+    "difficulty": "Intermedio",
+    "equipment": "Barra o Mancuernas",
+    "isCustom": false,
+    "instructions": "De pie con la barra o mancuernas frente a los muslos, pies a la anchura de las caderas. Mantén las rodillas ligeramente flexionadas y fijas durante todo el movimiento. Empuja las caderas hacia atrás mientras bajas el peso rozando las piernas, manteniendo la espalda completamente recta y el pecho hacia adelante. Baja hasta sentir un fuerte estiramiento en los isquiotibiales, sin llegar al suelo. Contrae los glúteos e isquios para volver a la posición inicial. No redondees la espalda baja en ningún momento."
+  },
+  {
+    "name": "Superman",
+    "mainGroup": "Espalda",
+    "musclesUsed": "Espalda baja",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Túmbate boca abajo en el suelo con los brazos extendidos al frente y las piernas rectas. Activa la espalda baja y los glúteos para elevar simultáneamente los brazos, el pecho y las piernas del suelo, como si volaras. Mantén la posición elevada 2-3 segundos apretando los músculos, luego baja controladamente sin relajar de golpe. Evita forzar el cuello mirando hacia arriba, mantén la cabeza en línea con la columna. Es un ejercicio fundamental para fortalecer los erectores espinales."
+  },
+  {
+    "name": "Jalón con banda",
+    "mainGroup": "Espalda",
+    "musclesUsed": "Dorsales",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Ancla la banda en un punto alto como una barra de dominadas o puerta. Arrodíllate o siéntate en el suelo de cara al anclaje y sujeta los extremos de la banda con ambas manos más abiertas que los hombros. Tira de la banda hacia el pecho retrayendo las escápulas y apretando los dorsales, llevando los codos hacia las caderas. Controla la subida para no dejar que la banda te arrastre. Simula el patrón de movimiento del jalón en polea, fundamental para desarrollar la amplitud de espalda."
+  },
+  {
+    "name": "Remo unilateral",
+    "mainGroup": "Espalda",
+    "musclesUsed": "Espalda",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna o Banda",
+    "isCustom": false,
+    "instructions": "Trabaja un brazo a la vez para detectar y corregir desequilibrios entre lados. De pie con ligera inclinación o apoyando la mano libre en una superficie estable. Tira del peso hacia la cadera retrayendo primero la escápula y luego flexionando el codo, sin rotar el tronco para compensar. Realiza todas las repeticiones en un lado antes de cambiar. Compara la fuerza entre ambos lados y enfócate en el más débil si hay diferencia notable."
+  },
+  {
+    "name": "Pull-over con banda",
+    "mainGroup": "Espalda",
+    "musclesUsed": "Dorsales",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Ancla la banda en un punto alto detrás de ti. De pie o tumbado, sujeta la banda con ambas manos y los brazos extendidos hacia el anclaje. Baja los brazos rectos hacia las caderas en un arco amplio, manteniendo una leve flexión en los codos. Aprieta los dorsales al final cuando los brazos lleguen a los muslos. Vuelve arriba lentamente controlando la tensión. Este movimiento es ideal para aislar el dorsal ancho sin necesitar barra ni banco."
+  },
+  {
+    "name": "Bird dog",
+    "mainGroup": "Espalda",
+    "musclesUsed": "Espalda, core",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Colócate en cuadrupedia con las manos bajo los hombros y las rodillas bajo las caderas. Mantén la espalda completamente plana y el core activado. Extiende simultáneamente el brazo derecho al frente y la pierna izquierda hacia atrás hasta que ambos queden paralelos al suelo. Mantén la posición 2-3 segundos sin rotar la cadera ni arquear la espalda. Vuelve al centro sin apoyar y repite con el otro lado. Es un ejercicio fundamental para la estabilidad lumbar y la coordinación."
+  },
+  {
+    "name": "Press militar con mancuernas",
+    "mainGroup": "Hombros",
+    "musclesUsed": "Hombros, tríceps",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "Siéntate en un banco con respaldo o de pie con los pies a la anchura de los hombros. Sujeta las mancuernas a la altura de los hombros con los codos a 90 grados y las palmas hacia adelante. Activa el core para proteger la zona lumbar y empuja las mancuernas hacia arriba convergiendo ligeramente hasta casi tocarlas sobre la cabeza sin bloquear los codos. Baja de forma controlada hasta la posición inicial. Evita arquear la espalda baja usando impulso, el movimiento debe ser limpio desde los hombros."
+  },
+  {
+    "name": "Elevaciones laterales",
+    "mainGroup": "Hombros",
+    "musclesUsed": "Deltoides lateral",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "De pie con las mancuernas a los lados del cuerpo y una ligera flexión en los codos. Eleva ambos brazos lateralmente hasta la altura de los hombros manteniendo las muñecas ligeramente más bajas que los codos, como si estuvieras vertiendo agua de dos jarras. Aguanta medio segundo en la parte alta apretando el deltoides lateral y baja lentamente en 3-4 segundos. Usa pesos ligeros y evita usar impulso del torso ya que es el error más común en este ejercicio."
+  },
+  {
+    "name": "Elevaciones frontales",
+    "mainGroup": "Hombros",
+    "musclesUsed": "Deltoides anterior",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "De pie con las mancuernas frente a los muslos, palmas hacia abajo o enfrentadas. Eleva un brazo o ambos hacia adelante hasta la altura de los hombros manteniendo los codos ligeramente flexionados. Contrae el deltoides anterior en la posición alta y baja lentamente. Evita balancear el tronco hacia atrás para añadir impulso. Ten en cuenta que el deltoides anterior ya recibe mucho trabajo en los press de pecho, así que este ejercicio puede trabajarse con volumen moderado."
+  },
+  {
+    "name": "Elevaciones posteriores",
+    "mainGroup": "Hombros",
+    "musclesUsed": "Deltoides posterior",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "Inclínate hacia adelante desde las caderas hasta que el torso quede casi paralelo al suelo, rodillas ligeramente flexionadas y espalda recta. Cuelga las mancuernas frente a ti con las palmas enfrentadas. Eleva los brazos hacia los lados manteniendo una ligera flexión en los codos, apretando el deltoides posterior y los romboides en la parte alta. Baja lentamente. El deltoides posterior suele estar muy poco desarrollado en la mayoría de personas, así que enfócate en la contracción y no en el peso."
+  },
+  {
+    "name": "Press Arnold",
+    "mainGroup": "Hombros",
+    "musclesUsed": "Hombros completos",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "Siéntate con las mancuernas frente a ti a la altura de los ojos, palmas mirando hacia ti como al final de un curl de bíceps. Al empujar hacia arriba, rota las muñecas hacia afuera de forma que cuando los brazos estén extendidos las palmas miren hacia adelante. Baja invirtiendo la rotación. Este movimiento único creado por Arnold Schwarzenegger recluta los tres haces del deltoides en un solo gesto. Usa un peso que te permita hacer la rotación completa con control."
+  },
+  {
+    "name": "Face pull con banda",
+    "mainGroup": "Hombros",
+    "musclesUsed": "Deltoides posterior",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Ancla la banda a la altura de los ojos. Sujeta los extremos con ambas manos y da un paso atrás para crear tensión. Con los brazos extendidos al frente, tira de la banda hacia tu cara abriendo bien los codos hacia los lados y hacia afuera, como si quisieras mostrar los bíceps. El objetivo es llevar las manos a los lados de la cabeza rotando externamente los hombros. Aprieta en la posición final y vuelve lentamente. Es uno de los mejores ejercicios para la salud del manguito rotador."
+  },
+  {
+    "name": "Remo al cuello",
+    "mainGroup": "Hombros",
+    "musclesUsed": "Trapecio, hombros",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas o Barra",
+    "isCustom": false,
+    "instructions": "De pie con las mancuernas o barra frente a los muslos y agarre prono. Tira del peso verticalmente hacia la barbilla llevando los codos bien altos y hacia afuera, manteniendo la barra o mancuernas cerca del cuerpo. Los codos deben quedar por encima de las muñecas en la posición alta. Baja controladamente. Ten cuidado con este ejercicio si tienes historial de problemas en el hombro ya que puede generar impingement si se hace con agarre muy cerrado o con demasiada carga."
+  },
+  {
+    "name": "Pike push-ups",
+    "mainGroup": "Hombros",
+    "musclesUsed": "Hombros",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Colócate en posición de flexión y eleva las caderas hasta formar una V invertida con el cuerpo, como en la postura de yoga del perro boca abajo. Las manos están a la anchura de los hombros y los pies más juntos. Flexiona los codos bajando la cabeza hacia el suelo entre las manos, manteniendo las caderas altas durante todo el movimiento. Empuja de vuelta. Este ejercicio simula el press militar con el peso corporal y es un excelente paso previo hacia las flexiones en vertical."
+  },
+  {
+    "name": "Press con banda (Hombros)",
+    "mainGroup": "Hombros",
+    "musclesUsed": "Hombros",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Pisa la banda con ambos pies a la anchura de las caderas y sujeta los extremos a la altura de los hombros con los codos doblados. De pie con el core activado, empuja ambas manos hacia arriba extendiendo los codos hasta casi bloquearlos sobre la cabeza. Baja de forma controlada. La resistencia progresiva de la banda hace que el ejercicio sea más difícil cuanto más arriba estiras, lo que coincide con la ventaja mecánica del hombro, creando una curva de resistencia muy efectiva."
+  },
+  {
+    "name": "Elevaciones en Y",
+    "mainGroup": "Hombros",
+    "musclesUsed": "Hombros, trapecio",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas o Banda",
+    "isCustom": false,
+    "instructions": "Inclínate hacia adelante o túmbate boca abajo en un banco inclinado. Con las mancuernas colgando o apoyadas, eleva los brazos en diagonal hacia arriba y afuera formando una Y con el cuerpo. Las palmas deben mirar hacia abajo o ligeramente hacia adelante. Aprieta el trapecio medio e inferior y los romboides en la posición elevada. Baja lentamente. Este ejercicio es fundamental para la postura y la estabilidad de la escápula, muy recomendado para personas que pasan mucho tiempo sentadas."
+  },
+  {
+    "name": "Curl con mancuernas",
+    "mainGroup": "Bíceps",
+    "musclesUsed": "Bíceps",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "De pie con los pies a la anchura de los hombros y las mancuernas a los lados con las palmas mirando hacia adelante. Manteniendo los codos pegados a los costados y fijos en esa posición, flexiona ambos brazos simultáneamente llevando las mancuernas hacia los hombros. Aprieta el bíceps en la posición alta aguantando un segundo y baja de forma muy lenta en 3-4 segundos para maximizar el estímulo en la fase excéntrica. Evita balancear el torso o separar los codos del cuerpo para añadir impulso."
+  },
+  {
+    "name": "Curl alterno",
+    "mainGroup": "Bíceps",
+    "musclesUsed": "Bíceps",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "La mecánica es igual al curl con mancuernas pero trabajando un brazo cada vez. Mientras un brazo sube, el otro baja de forma controlada. Esto permite concentrarte en la contracción de cada bíceps por separado y detectar desequilibrios entre brazos. Mantén el hombro del brazo que trabaja completamente estático y el codo pegado al costado. Puedes supinar la muñeca durante el movimiento, girando la palma hacia el techo, para aumentar la activación del bíceps."
+  },
+  {
+    "name": "Curl martillo",
+    "mainGroup": "Bíceps",
+    "musclesUsed": "Bíceps, antebrazo",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "Sujeta las mancuernas con las palmas enfrentadas, como si estuvieras sujetando dos martillos. Mantén esta posición neutral de la muñeca durante todo el movimiento. Flexiona los codos llevando las mancuernas hacia los hombros sin rotar la muñeca. Este agarre trabaja intensamente el músculo braquiorradial del antebrazo y el braquial, que queda por debajo del bíceps y al desarrollarlo hace que el brazo parezca más voluminoso y definido. Baja lentamente para maximizar el estímulo."
+  },
+  {
+    "name": "Curl concentrado",
+    "mainGroup": "Bíceps",
+    "musclesUsed": "Bíceps",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "Siéntate en un banco con las piernas abiertas. Apoya el codo de trabajo en el interior del muslo del mismo lado, con el brazo completamente extendido. Sujeta la mancuerna con la palma hacia afuera. Flexiona el codo llevando la mancuerna hacia el hombro apretando al máximo el bíceps en la contracción. La posición del codo apoyado en el muslo elimina cualquier posibilidad de hacer trampa con el hombro, por lo que es uno de los ejercicios con mayor aislamiento de bíceps. Baja lentamente y repite todas las reps antes de cambiar de brazo."
+  },
+  {
+    "name": "Curl con banda",
+    "mainGroup": "Bíceps",
+    "musclesUsed": "Bíceps",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Pisa la banda con ambos pies a la anchura de los hombros y sujeta los extremos con las palmas hacia adelante. Mantén los codos pegados al cuerpo y realiza el curl subiendo las manos hacia los hombros. La banda proporciona más resistencia en la posición contraída, lo contrario que la mancuerna, lo cual puede ser un estímulo novedoso y complementario. Baja lentamente controlando la resistencia. Puedes ajustar la dificultad pisando la banda con más o menos longitud libre."
+  },
+  {
+    "name": "Curl inclinado",
+    "mainGroup": "Bíceps",
+    "musclesUsed": "Bíceps",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas, Banco",
+    "isCustom": false,
+    "instructions": "Ajusta el banco a unos 45-60 grados e inclínate sobre él con la espalda apoyada. Deja que los brazos cuelguen completamente hacia el suelo con las mancuernas, lo que estira el bíceps en la posición inicial más de lo habitual. Flexiona los codos llevando las mancuernas hacia los hombros sin mover el hombro hacia adelante. Esta posición extendida inicial aumenta el estiramiento del bíceps, haciéndolo trabajar en un rango de movimiento más largo y generando mayor hipertrofia según estudios recientes."
+  },
+  {
+    "name": "Curl 21s",
+    "mainGroup": "Bíceps",
+    "musclesUsed": "Bíceps",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas o Barra",
+    "isCustom": false,
+    "instructions": "Divide el recorrido del curl en tres fases de 7 repeticiones cada una. Primero haz 7 repeticiones de la mitad inferior del movimiento, del punto más bajo hasta los 90 grados. Luego 7 repeticiones de la mitad superior, de los 90 grados hasta el pecho. Finalmente 7 repeticiones completas. Las 21 repeticiones se realizan sin descanso entre fases. Este método trabaja el bíceps en todos sus ángulos y genera una congestión muscular muy intensa. Usa un peso más ligero de lo habitual al principio."
+  },
+  {
+    "name": "Curl inverso",
+    "mainGroup": "Bíceps",
+    "musclesUsed": "Antebrazo",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas o Barra",
+    "isCustom": false,
+    "instructions": "Sujeta las mancuernas o barra con un agarre prono, es decir, con las palmas mirando hacia el suelo. Mantén los codos pegados al cuerpo y realiza el curl subiendo el peso hacia los hombros. Este agarre invertido pone en desventaja mecánica al bíceps y hace que el trabajo recaiga principalmente en el braquiorradial y el extensor del carpo. Es un ejercicio excelente para equilibrar el desarrollo del antebrazo y mejorar la estética del brazo visto de frente."
+  },
+  {
+    "name": "Curl isométrico",
+    "mainGroup": "Bíceps",
+    "musclesUsed": "Bíceps",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "Sujeta la mancuerna y lleva el brazo a la posición de 90 grados, con el codo flexionado y el antebrazo paralelo al suelo. Mantén esta posición bajo tensión el máximo tiempo posible sin que el ángulo cambie significativamente. Puedes realizarlo bilateralmente o con un brazo mientras el otro hace curl dinámico. La contracción isométrica recluta muchas unidades motoras simultáneamente y genera alta tensión muscular con poco movimiento articular, ideal para fases de congestión o rehabilitación."
+  },
+  {
+    "name": "Curl tipo predicador",
+    "mainGroup": "Bíceps",
+    "musclesUsed": "Bíceps",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuerna o Barra, Banco",
+    "isCustom": false,
+    "instructions": "Apoya la parte posterior de los brazos sobre el banco predicador o sobre la parte inclinada de un banco ajustable. Esto fija los codos y elimina cualquier movimiento del hombro. Baja el peso de forma completamente controlada hasta casi extender los codos, sintiendo el estiramiento en el bíceps. Sube hasta la contracción máxima sin levantar los codos del apoyo. La posición del predicador es especialmente efectiva para trabajar el bíceps en el rango estirado, donde se genera más tensión mecánica."
+  },
+  {
+    "name": "Fondos en banco",
+    "mainGroup": "Tríceps",
+    "musclesUsed": "Tríceps",
+    "difficulty": "Principiante",
+    "equipment": "Banco o Silla",
+    "isCustom": false,
+    "instructions": "Apoya las manos en el borde de un banco detrás de ti con los dedos apuntando hacia adelante. Las piernas pueden estar extendidas al frente para más dificultad o dobladas para hacerlo más fácil. Baja el cuerpo doblando los codos hasta llegar a 90 grados, manteniendo la espalda cerca del banco. Empuja de vuelta a la posición inicial contrayendo los tríceps. Evita dejar caer los hombros hacia adelante y no bajes más allá de los 90 grados para proteger la articulación glenohumeral."
+  },
+  {
+    "name": "Extensión con mancuerna",
+    "mainGroup": "Tríceps",
+    "musclesUsed": "Tríceps",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "De pie o sentado, sujeta una mancuerna con una mano y llévala por detrás de la cabeza doblando el codo. Mantén el brazo pegado a la cabeza con el codo apuntando al techo y el core activado para no arquear la espalda. Extiende el codo empujando la mancuerna hacia arriba hasta casi bloquarlo y baja lentamente sintiendo el estiramiento del tríceps. La cabeza larga del tríceps se estira al máximo en esta posición, lo que la hace muy eficiente para el desarrollo del músculo. Realiza todas las reps en un brazo antes de cambiar."
+  },
+  {
+    "name": "Extensión por encima de la cabeza",
+    "mainGroup": "Tríceps",
+    "musclesUsed": "Tríceps",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "Sujeta una mancuerna con ambas manos por la parte superior del peso y llévala por detrás de la cabeza con los codos apuntando al techo y los brazos cerca de las orejas. Extiende los codos empujando la mancuerna hacia arriba hasta casi bloquearlos. Baja de forma lenta y controlada hasta sentir el estiramiento. Esta variante bilateral permite usar más peso que la unilateral y trabaja intensamente la cabeza larga del tríceps por el estiramiento que se produce en la posición inicial."
+  },
+  {
+    "name": "Patada de tríceps",
+    "mainGroup": "Tríceps",
+    "musclesUsed": "Tríceps",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "Inclínate hacia adelante con el torso paralelo al suelo, apoya la mano libre en un banco. Sujeta la mancuerna con la mano de trabajo y lleva el codo al nivel de la cadera con el brazo doblado a 90 grados. Desde esta posición, extiende solo el antebrazo hacia atrás hasta que el brazo quede completamente recto y paralelo al suelo. Aprieta el tríceps en la posición extendida y baja lentamente. El truco está en mantener el codo completamente quieto durante todo el movimiento, solo se mueve el antebrazo."
+  },
+  {
+    "name": "Extensión con banda",
+    "mainGroup": "Tríceps",
+    "musclesUsed": "Tríceps",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Ancla la banda en un punto alto. De pie frente al anclaje, sujeta los extremos de la banda con las manos a la altura del pecho y los codos doblados pegados al cuerpo. Empuja las manos hacia abajo extendiendo los codos hasta que los brazos queden completamente rectos, apretando el tríceps en la posición inferior. Vuelve lentamente a la posición inicial sin separar los codos del cuerpo. Simula el press de tríceps en polea y es muy efectivo por la tensión constante que proporciona la banda."
+  },
+  {
+    "name": "Flexiones cerradas",
+    "mainGroup": "Tríceps",
+    "musclesUsed": "Tríceps",
+    "difficulty": "Intermedio",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Colócate en posición de flexión con las manos juntas directamente bajo el esternón, formando un triángulo o simplemente con las manos a la anchura de los hombros o menos. Al bajar, mantén los codos cerca del cuerpo y apuntando hacia atrás en lugar de hacia los lados. Esto transfiere gran parte del trabajo del pecho a los tríceps. Baja hasta que el pecho casi toque las manos y empuja explosivamente hacia arriba. Es una variante exigente que requiere buena base de fuerza en los tríceps."
+  },
+  {
+    "name": "Press cerrado",
+    "mainGroup": "Tríceps",
+    "musclesUsed": "Tríceps",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas o Barra, Banco",
+    "isCustom": false,
+    "instructions": "Túmbate en banco plano con las mancuernas o barra y agarra el peso a la anchura de los hombros o menos. Baja el peso hacia el pecho manteniendo los codos pegados al cuerpo y apuntando hacia los pies. Empuja de vuelta sin abrir los codos. El agarre cerrado y la posición de los codos junto al torso redirigen el trabajo desde el pecho hacia los tríceps. Usa un peso ligeramente inferior al que usarías para press de pecho normal y asegúrate de tener control total del movimiento."
+  },
+  {
+    "name": "Extensión unilateral",
+    "mainGroup": "Tríceps",
+    "musclesUsed": "Tríceps",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "De pie o sentado, lleva una mancuerna por detrás de la cabeza con un solo brazo, codo apuntando al techo y el brazo pegado a la cabeza. Extiende el codo empujando la mancuerna hacia arriba y baja lentamente. Trabajar un brazo a la vez permite corregir desequilibrios y usar un rango de movimiento completo. Con la mano libre puedes apoyar el codo del brazo que trabaja para mayor estabilidad. Realiza el mismo número de repeticiones en ambos lados."
+  },
+  {
+    "name": "Kickback con banda",
+    "mainGroup": "Tríceps",
+    "musclesUsed": "Tríceps",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Pisa la banda con el pie del mismo lado del brazo que trabaja e inclínate hacia adelante. Lleva el codo al nivel de la cadera con el brazo doblado a 90 grados sujetando la banda. Extiende el antebrazo hacia atrás hasta que el brazo quede completamente recto. La banda proporciona mayor resistencia al final del movimiento donde el tríceps está más contraído, a diferencia de la mancuerna cuya resistencia es máxima al inicio. Mantén el codo fijo y baja controladamente."
+  },
+  {
+    "name": "Fondos entre bancos",
+    "mainGroup": "Tríceps",
+    "musclesUsed": "Tríceps",
+    "difficulty": "Intermedio",
+    "equipment": "Dos Bancos",
+    "isCustom": false,
+    "instructions": "Coloca dos bancos paralelos. Apoya las manos en uno y los talones en el otro con las piernas extendidas. Esta posición eleva el punto de apoyo de los pies respecto a los fondos normales, aumentando la carga sobre los tríceps. Baja el cuerpo doblando los codos hasta los 90 grados manteniendo la espalda cerca del banco de manos. Para aumentar aún más la dificultad puedes colocar un disco sobre los muslos. Controla siempre el descenso y no bajes más de lo necesario."
+  },
+  {
+    "name": "Sentadilla",
+    "mainGroup": "Piernas",
+    "musclesUsed": "Cuádriceps, glúteos",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "De pie con los pies ligeramente más abiertos que los hombros y las puntas ligeramente hacia afuera. Mantén el pecho erguido, la mirada al frente y los brazos extendidos al frente para equilibrio. Empuja las rodillas hacia afuera en la dirección de las puntas y baja la cadera como si fueras a sentarte en una silla imaginaria hasta que los muslos queden paralelos al suelo o más abajo. Mantén los talones en el suelo durante todo el movimiento. Sube empujando el suelo con los pies y apretando glúteos al final."
+  },
+  {
+    "name": "Sentadilla con mancuernas",
+    "mainGroup": "Piernas",
+    "musclesUsed": "Piernas",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "Sujeta las mancuernas a los lados del cuerpo o apóyalas sobre los hombros para mayor comodidad. La mecánica es idéntica a la sentadilla libre: pies separados, puntas hacia afuera, rodillas siguiendo la dirección de los pies y espalda recta durante todo el movimiento. Las mancuernas permiten añadir carga de forma progresiva sin necesitar una barra. La posición lateral de los pesos puede resultar más cómoda para la muñeca y el hombro que otras variantes con carga."
+  },
+  {
+    "name": "Sentadilla búlgara",
+    "mainGroup": "Piernas",
+    "musclesUsed": "Cuádriceps, glúteos",
+    "difficulty": "Avanzado",
+    "equipment": "Mancuernas, Banco",
+    "isCustom": false,
+    "instructions": "Colócate de pie a un paso de distancia de un banco. Apoya el empeine del pie trasero sobre el banco. Con el pie delantero firme en el suelo, baja la cadera verticalmente doblando la rodilla delantera hasta que la trasera casi toque el suelo. La rodilla delantera debe seguir la dirección del pie sin pasarse de la punta. Sube empujando con el talón delantero. Es uno de los ejercicios más exigentes para las piernas ya que requiere equilibrio, movilidad de cadera y fuerza unilateral. Empieza sin peso hasta dominar el equilibrio."
+  },
+  {
+    "name": "Zancadas",
+    "mainGroup": "Piernas",
+    "musclesUsed": "Piernas",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal o Mancuernas",
+    "isCustom": false,
+    "instructions": "De pie con los pies juntos, da un paso largo hacia adelante con una pierna. Baja la rodilla trasera hacia el suelo de forma controlada manteniendo el torso erguido y la rodilla delantera alineada sobre el pie sin sobrepasar la punta. Cuando la rodilla trasera casi toque el suelo, empuja con el pie delantero para volver a la posición inicial. Alterna las piernas en cada repetición. Mantén el equilibrio y el core activado durante todo el movimiento para proteger la rodilla y la cadera."
+  },
+  {
+    "name": "Zancadas caminando",
+    "mainGroup": "Piernas",
+    "musclesUsed": "Piernas",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal o Mancuernas",
+    "isCustom": false,
+    "instructions": "A diferencia de las zancadas estáticas, en esta variante avanzas con cada paso en lugar de volver a la posición inicial. Da un paso largo adelante, baja la rodilla trasera y en lugar de volver atrás, lleva el pie trasero hacia adelante para dar el siguiente paso con la otra pierna. Necesitas más espacio pero el movimiento continuo aumenta el estímulo cardiovascular y trabaja el equilibrio dinámico de forma más exigente. Mantén el torso erguido y usa mancuernas cuando el peso corporal ya no sea suficiente reto."
+  },
+  {
+    "name": "Peso muerto rumano",
+    "mainGroup": "Piernas",
+    "musclesUsed": "Isquios",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas o Barra",
+    "isCustom": false,
+    "instructions": "De pie con el peso frente a los muslos y pies a la anchura de las caderas. Mantén las rodillas ligeramente flexionadas y fijas en esa posición durante todo el movimiento. Empuja las caderas hacia atrás mientras el peso baja rozando las piernas, manteniendo la espalda completamente recta y el pecho hacia adelante. Baja hasta sentir un fuerte estiramiento en los isquiotibiales sin redondear la espalda baja. Contrae activamente los isquios y glúteos para volver a la posición erguida. Este ejercicio es fundamental para el desarrollo de los isquios."
+  },
+  {
+    "name": "Step-up en banco",
+    "mainGroup": "Piernas",
+    "musclesUsed": "Piernas",
+    "difficulty": "Principiante",
+    "equipment": "Banco o Cajón",
+    "isCustom": false,
+    "instructions": "Colócate frente a un banco o cajón a la altura de la rodilla aproximadamente. Sube con una pierna colocando el pie completo sobre la superficie y empuja con el talón para elevar el cuerpo hasta que ambas piernas estén extendidas sobre el banco. Baja la pierna trasera de forma controlada hasta volver al suelo. Alterna o realiza todas las reps en una pierna antes de cambiar. Para añadir dificultad sujeta mancuernas a los lados. El step-up trabaja el glúteo y cuádriceps de la pierna que sube de forma muy efectiva."
+  },
+  {
+    "name": "Sentadilla sumo",
+    "mainGroup": "Piernas",
+    "musclesUsed": "Aductores",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal o Mancuerna",
+    "isCustom": false,
+    "instructions": "Coloca los pies considerablemente más abiertos que la anchura de los hombros con las puntas apuntando hacia afuera a unos 45 grados. Mantén el torso erguido y baja la cadera verticalmente hasta que los muslos queden paralelos al suelo, empujando las rodillas hacia afuera en la dirección de las puntas. Esta apertura de piernas activa intensamente los aductores, el glúteo medio y el glúteo mayor. Puedes sujetar una mancuerna pesada entre las piernas colgando para añadir resistencia mientras mantienes las manos libres de tensión."
+  },
+  {
+    "name": "Sentadilla con salto",
+    "mainGroup": "Piernas",
+    "musclesUsed": "Piernas",
+    "difficulty": "Intermedio",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Realiza una sentadilla hasta la posición paralela y en lugar de subir de forma lenta, genera una explosión máxima empujando el suelo con fuerza para despegar y saltar lo más alto posible. En el aire, extiende completamente las piernas y al aterrizar absorbe el impacto aterrizando suavemente sobre la puntera y amortiguando con las rodillas directamente hacia la próxima sentadilla. Este ejercicio desarrolla la potencia y la fuerza explosiva del tren inferior. No recomendado en superficies duras sin buen calzado."
+  },
+  {
+    "name": "Wall sit",
+    "mainGroup": "Piernas",
+    "musclesUsed": "Cuádriceps",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Apoya la espalda completamente contra una pared y deslízate hacia abajo hasta que las rodillas formen un ángulo de 90 grados y los muslos queden paralelos al suelo. Los pies deben estar directamente debajo de las rodillas con los talones en el suelo. Mantén los brazos relajados o cruzados en el pecho. Aguanta en esta posición el mayor tiempo posible. Es un ejercicio isométrico que genera una tensión enorme en el cuádriceps sin impacto articular, ideal para atletas en rehabilitación o como finalizador de entrenamiento."
+  },
+  {
+    "name": "Hip thrust",
+    "mainGroup": "Glúteos",
+    "musclesUsed": "Glúteos",
+    "difficulty": "Intermedio",
+    "equipment": "Banco, Barra o Mancuerna",
+    "isCustom": false,
+    "instructions": "Apoya la parte superior de la espalda sobre un banco y coloca la barra o mancuerna sobre las caderas con protección. Los pies están en el suelo a la anchura de las caderas con las rodillas a 90 grados. Desde la posición baja con las caderas cerca del suelo, empuja la cadera hacia arriba apretando fuertemente los glúteos hasta que el torso quede paralelo al suelo. Aguanta la contracción un segundo en la posición alta y baja lentamente. Es el ejercicio con mayor activación del glúteo máximo según estudios de electromiografía."
+  },
+  {
+    "name": "Puente de glúteos",
+    "mainGroup": "Glúteos",
+    "musclesUsed": "Glúteos",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Túmbate boca arriba con las rodillas dobladas y los pies apoyados en el suelo a la anchura de las caderas. Coloca los brazos a los lados con las palmas hacia abajo para dar estabilidad. Activa los glúteos y empuja la pelvis hacia el techo apretando los glúteos al máximo en la posición alta hasta que el cuerpo forme una línea recta desde los hombros hasta las rodillas. Aguanta un segundo en la parte alta y baja lentamente. Para añadir dificultad puedes colocar una mancuerna o disco sobre las caderas o elevar un pie."
+  },
+  {
+    "name": "Patada de glúteo",
+    "mainGroup": "Glúteos",
+    "musclesUsed": "Glúteos",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal o Banda",
+    "isCustom": false,
+    "instructions": "Colócate en cuadrupedia con las manos bajo los hombros y las rodillas bajo las caderas. Mantén la espalda completamente plana y el core activado. Sin rotar la pelvis ni arquear la espalda, extiende una pierna hacia atrás y arriba manteniendo la rodilla doblada a 90 grados y el pie en flexión. Aprieta el glúteo en la posición alta aguantando un segundo. Baja lentamente sin llegar a apoyar la rodilla en el suelo y repite. Realiza todas las reps en una pierna antes de cambiar. Con banda de resistencia en las rodillas aumenta significativamente la dificultad."
+  },
+  {
+    "name": "Abducción con banda",
+    "mainGroup": "Glúteos",
+    "musclesUsed": "Glúteo medio",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Coloca la banda de resistencia justo por encima de las rodillas. De pie con los pies a la anchura de las caderas, dobla ligeramente las rodillas. Abre una pierna hacia el lado contra la resistencia de la banda manteniendo el torso erguido y sin inclinar la cadera. Aprieta el glúteo medio en la posición abierta y vuelve lentamente. También puedes realizarlo sentado en un banco con las rodillas separadas. El glúteo medio es fundamental para la estabilidad de la cadera y la alineación de la rodilla durante la carrera y los saltos."
+  },
+  {
+    "name": "Fire hydrant",
+    "mainGroup": "Glúteos",
+    "musclesUsed": "Glúteos",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal o Banda",
+    "isCustom": false,
+    "instructions": "Colócate en cuadrupedia con la espalda plana y el core activo. Manteniendo la rodilla doblada a 90 grados, abre la pierna hacia el lado como si fuera la pata de un perro marcando territorio, de ahí su nombre. El movimiento es pura abducción de cadera sin rotar el tronco ni inclinar la pelvis. Aprieta el glúteo medio en la posición elevada y baja lentamente. Con una banda elástica encima de las rodillas aumenta considerablemente la dificultad. Es complementario a la patada de glúteo para desarrollar todos los haces del glúteo."
+  },
+  {
+    "name": "Hip thrust con banda",
+    "mainGroup": "Glúteos",
+    "musclesUsed": "Glúteos",
+    "difficulty": "Intermedio",
+    "equipment": "Banda elástica, Banco",
+    "isCustom": false,
+    "instructions": "Coloca la banda elástica sobre las caderas anclando los extremos con las manos o los pies. La mecánica es idéntica al hip thrust normal pero la banda añade resistencia en la posición alta donde los glúteos están más contraídos. Esto complementa muy bien la curva de resistencia ya que la barra pesa igual en todo el recorrido mientras que la banda aumenta progresivamente. Empuja la cadera hacia arriba apretando los glúteos y aguanta la contracción en la posición superior antes de bajar lentamente."
+  },
+  {
+    "name": "Peso muerto sumo",
+    "mainGroup": "Glúteos",
+    "musclesUsed": "Glúteos",
+    "difficulty": "Intermedio",
+    "equipment": "Barra o Mancuernas",
+    "isCustom": false,
+    "instructions": "Colócate con los pies muy abiertos y las puntas apuntando hacia afuera entre 30 y 45 grados. La barra queda entre las piernas. Agáchate sujetando la barra con los brazos dentro de las piernas, espalda recta y pecho hacia adelante. Empuja el suelo con ambos pies hacia afuera mientras extiendes caderas y rodillas para levantarte. Esta posición amplia enfatiza el trabajo del glúteo mayor y los aductores respecto al peso muerto convencional. Los brazos van completamente rectos y verticales durante todo el movimiento."
+  },
+  {
+    "name": "Step-up lateral",
+    "mainGroup": "Glúteos",
+    "musclesUsed": "Glúteos",
+    "difficulty": "Principiante",
+    "equipment": "Banco o Cajón",
+    "isCustom": false,
+    "instructions": "Colócate de lado a un banco o step. Sube con la pierna más cercana colocando el pie completo sobre la superficie. Empuja con el talón de esa pierna para elevar el cuerpo y une el otro pie al banco. Baja la pierna que subió primero de forma controlada de vuelta al suelo. Este movimiento lateral trabaja el glúteo medio y el tensor de la fascia lata de forma diferente a los movimientos sagitales como el step-up frontal, siendo muy útil para estabilidad de cadera y prevención de lesiones de rodilla."
+  },
+  {
+    "name": "Puente unilateral",
+    "mainGroup": "Glúteos",
+    "musclesUsed": "Glúteos",
+    "difficulty": "Intermedio",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Túmbate boca arriba con las rodillas dobladas y levanta una pierna extendida en el aire. Empuja la cadera hacia el techo usando únicamente la pierna apoyada en el suelo, apretando el glúteo al máximo en la posición alta. La pierna elevada debe permanecer en línea con el torso en la parte superior. Baja lentamente y repite todas las reps antes de cambiar de pierna. Esta variante unilateral dobla la carga sobre cada glúteo y ayuda a identificar y corregir desequilibrios entre lados que pueden no ser evidentes en el ejercicio bilateral."
+  },
+  {
+    "name": "Sentadilla sumo con mancuerna",
+    "mainGroup": "Glúteos",
+    "musclesUsed": "Glúteos",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "De pie con los pies muy abiertos y las puntas hacia afuera, sujeta una mancuerna pesada verticalmente con ambas manos entre las piernas. Mantén el torso erguido y baja la cadera verticalmente empujando las rodillas hacia afuera siguiendo las puntas. Cuando los muslos lleguen al paralelo o más abajo, empuja con los talones para subir apretando glúteos y aductores. Sujetar la mancuerna entre las piernas permite usar cargas pesadas sin necesitar barra y enfatiza el glúteo mayor y los aductores de la cara interna del muslo."
+  },
+  {
+    "name": "Plancha",
+    "mainGroup": "Core",
+    "musclesUsed": "Core",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Apóyate sobre los antebrazos y las puntas de los pies. Los codos deben estar directamente bajo los hombros. Activa el abdomen llevando el ombligo hacia la columna y aprieta los glúteos para mantener el cuerpo completamente recto desde la cabeza hasta los talones, sin dejar caer la cadera ni elevarla. Mantén la respiración constante durante el tiempo de aguante. Si notas que la cadera empieza a caer es mejor parar y descansar que mantener una posición incorrecta que puede dañar la zona lumbar."
+  },
+  {
+    "name": "Plancha lateral",
+    "mainGroup": "Core",
+    "musclesUsed": "Oblicuos",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Apóyate sobre un solo antebrazo con el codo bajo el hombro. Los pies pueden estar juntos o en escalonados para más estabilidad. Eleva las caderas del suelo hasta que el cuerpo forme una línea diagonal recta de la cabeza a los pies. Activa los oblicuos para evitar que la cadera caiga. El brazo libre puede apoyarse en la cadera o extenderse hacia el techo. Aguanta el tiempo indicado y repite en el otro lado. Para hacerlo más difícil puedes elevar la pierna superior o añadir una rotación del torso."
+  },
+  {
+    "name": "Crunch",
+    "mainGroup": "Core",
+    "musclesUsed": "Abdominales",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Túmbate boca arriba con las rodillas dobladas y los pies en el suelo. Coloca las manos detrás de la cabeza sin entrelazar los dedos o cruza los brazos sobre el pecho. Activa el abdomen y eleva solo la parte superior de la espalda del suelo, aproximando el esternón hacia las rodillas. No es necesario llegar a sentarte completamente, con elevar los omóplatos del suelo es suficiente para activar el recto abdominal. Baja lentamente sin relajar el abdomen entre repeticiones. Evita tirar del cuello con las manos."
+  },
+  {
+    "name": "Crunch con peso",
+    "mainGroup": "Core",
+    "musclesUsed": "Abdominales",
+    "difficulty": "Intermedio",
+    "equipment": "Disco o Mancuerna",
+    "isCustom": false,
+    "instructions": "Realiza el crunch estándar pero sujeta un disco o mancuerna en el pecho o sobre la cabeza para aumentar la resistencia. Comenzar con el peso en el pecho es más sencillo ya que el brazo de palanca es más corto. Llevar el peso sobre la cabeza aumenta considerablemente la dificultad. Mantén la activación abdominal durante todo el movimiento y no uses impulso del cuello para compensar. Añadir carga progresiva al crunch es fundamental para desarrollar hipertrofia en el recto abdominal a largo plazo."
+  },
+  {
+    "name": "Elevaciones de piernas",
+    "mainGroup": "Core",
+    "musclesUsed": "Abdominales inferiores",
+    "difficulty": "Intermedio",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Túmbate boca arriba con las piernas estiradas y las manos bajo las nalgas para proteger la zona lumbar. Activa el abdomen presionando la espalda baja contra el suelo y levanta ambas piernas juntas y rectas hasta los 90 grados. Baja lentamente sin permitir que la espalda baja se despegue del suelo. Si sientes que la zona lumbar se arquea, dobla ligeramente las rodillas para reducir el brazo de palanca. Este ejercicio trabaja intensamente el recto abdominal inferior y el psoas, zona habitualmente poco trabajada."
+  },
+  {
+    "name": "Russian twist",
+    "mainGroup": "Core",
+    "musclesUsed": "Oblicuos",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal o Disco",
+    "isCustom": false,
+    "instructions": "Siéntate en el suelo con las rodillas dobladas y los pies ligeramente elevados del suelo o apoyados para simplificar. Inclínate hacia atrás hasta que el torso forme unos 45 grados con el suelo. Con las manos juntas o sujetando un peso, gira el tronco de un lado al otro de forma controlada, intentando tocar el suelo junto a cada cadera. El movimiento debe venir de la rotación del tronco, no de los brazos. Mantén el abdomen activo y los pies en el aire para mayor dificultad."
+  },
+  {
+    "name": "Mountain climbers",
+    "mainGroup": "Core",
+    "musclesUsed": "Core",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Colócate en posición de plancha alta con los brazos extendidos. Mantén las caderas bajas y el core activo en todo momento. Lleva una rodilla hacia el pecho y antes de que toque el suelo, devuélvela a la posición inicial y lleva la otra rodilla. Alterna las piernas de forma rápida y controlada como si corrieras en el sitio en posición horizontal. Cuanto más rápido lo hagas más componente cardiovascular tiene el ejercicio, y a ritmo lento y controlado se convierte en un ejercicio de core muy exigente."
+  },
+  {
+    "name": "Dead bug",
+    "mainGroup": "Core",
+    "musclesUsed": "Core",
+    "difficulty": "Principiante",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Túmbate boca arriba con los brazos extendidos hacia el techo y las caderas y rodillas a 90 grados en el aire. Presiona la espalda baja contra el suelo activamente durante todo el ejercicio. Extiende simultáneamente el brazo derecho hacia atrás sobre la cabeza y la pierna izquierda hacia adelante cerca del suelo sin que toquen el suelo. Vuelve al centro y repite con el brazo izquierdo y la pierna derecha. El objetivo es mantener la columna neutral mientras los extremos se mueven, lo que activa profundamente el transverso abdominal."
+  },
+  {
+    "name": "V-ups",
+    "mainGroup": "Core",
+    "musclesUsed": "Abdominales",
+    "difficulty": "Avanzado",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Túmbate boca arriba con brazos y piernas extendidos. Desde esta posición completamente estirada, eleva simultáneamente piernas y torso del suelo intentando tocar los pies con las manos formando una V con el cuerpo. Tanto las piernas como los brazos deben llegar lo más arriba posible. Baja lentamente volviendo a la posición inicial sin tocar del todo el suelo para mantener la tensión. Es un ejercicio avanzado que requiere mucha fuerza abdominal y flexibilidad de isquios. Si no llegas a tocar los pies, intenta acercar manos y pies lo máximo posible."
+  },
+  {
+    "name": "Hollow hold",
+    "mainGroup": "Core",
+    "musclesUsed": "Core",
+    "difficulty": "Intermedio",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Túmbate boca arriba y activa el abdomen presionando la espalda baja contra el suelo. Eleva los hombros y las piernas del suelo simultáneamente, con los brazos extendidos junto a las orejas. El cuerpo debe formar una ligera curva cóncava como una barca volteada. Mantén la zona lumbar pegada al suelo en todo momento, es el punto clave del ejercicio. Si las piernas están muy bajas y la espalda se arquea, sube las piernas más arriba o dobla ligeramente las rodillas para facilitar el mantener el contacto lumbar con el suelo."
+  },
+  {
+    "name": "Burpees",
+    "mainGroup": "Cuerpo Completo",
+    "musclesUsed": "Full body",
+    "difficulty": "Intermedio",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "De pie, agáchate y apoya las manos en el suelo. Salta o camina los pies hacia atrás hasta la posición de plancha alta. Realiza una flexión completa. Salta o camina los pies hacia las manos y desde la posición agachada, salta explosivamente hacia arriba con los brazos extendidos sobre la cabeza. Aterriza suavemente y encadena la siguiente repetición. Puedes modular la intensidad realizando la flexión opcional o sin salto al final. Es uno de los ejercicios más demandantes metabólicamente por la cantidad de grupos musculares que involucra."
+  },
+  {
+    "name": "Thrusters con mancuernas",
+    "mainGroup": "Cuerpo Completo",
+    "musclesUsed": "Piernas, hombros",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "De pie con las mancuernas a la altura de los hombros, palmas hacia adentro. Realiza una sentadilla profunda y al subir aprovecha el impulso para empujar las mancuernas directamente por encima de la cabeza en un movimiento fluido y continuo. Los dos movimientos deben ser una sola acción coordinada, no dos movimientos separados. Baja las mancuernas a los hombros mientras bajas de vuelta a la sentadilla. Es un ejercicio de alta demanda cardiovascular y muscular muy utilizado en CrossFit y entrenamientos funcionales."
+  },
+  {
+    "name": "Clean con mancuernas",
+    "mainGroup": "Cuerpo Completo",
+    "musclesUsed": "Full body",
+    "difficulty": "Avanzado",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "Con las mancuernas en el suelo o a la altura de las rodillas, realiza un tirón explosivo extendiendo caderas y rodillas de forma potente. Aprovecha ese impulso para encogerte ligeramente y recibir las mancuernas en los hombros con los codos elevados. Las mancuernas llegan a los hombros por la velocidad generada en las caderas, no por la fuerza de los brazos. Extiende las piernas para finalizar. Es un movimiento técnico que requiere práctica. Comienza con poco peso para aprender la coordinación del triple estiramiento."
+  },
+  {
+    "name": "Snatch con mancuerna",
+    "mainGroup": "Cuerpo Completo",
+    "musclesUsed": "Full body",
+    "difficulty": "Avanzado",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "Con una mancuerna entre los pies, realiza un tirón potente extendiendo caderas y rodillas explosivamente. Continúa tirando con el brazo llevando el codo alto y al llegar a la máxima altura, rota la muñeca y extiende el brazo para recibir la mancuerna sobre la cabeza con el brazo bloqueado. Todo ocurre en un solo movimiento continuo. La clave es la extensión explosiva de cadera, los brazos solo guían la mancuerna. Alterna brazos o realiza series en un solo lado. Requiere práctica técnica importante antes de añadir carga."
+  },
+  {
+    "name": "Swing con mancuerna",
+    "mainGroup": "Cuerpo Completo",
+    "musclesUsed": "Glúteos, core",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "De pie con los pies a la anchura de los hombros, sujeta una mancuerna con ambas manos. Flexiona ligeramente las rodillas y empuja las caderas hacia atrás dejando la mancuerna balancear entre las piernas. Desde ahí, empuja explosivamente las caderas hacia adelante y arriba proyectando la mancuerna hacia adelante hasta la altura de los hombros. El movimiento viene de las caderas, no de los brazos, estos solo siguen el impulso. Baja la mancuerna controladamente volviendo a la posición inicial. Es un excelente ejercicio de potencia de cadera."
+  },
+  {
+    "name": "Farmer walk",
+    "mainGroup": "Cuerpo Completo",
+    "musclesUsed": "Core, agarre",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas o Pesas",
+    "isCustom": false,
+    "instructions": "Sujeta una mancuerna pesada en cada mano a los lados del cuerpo. Mantén el torso completamente erguido, los hombros hacia atrás y el core activado para resistir la inclinación lateral. Camina un número determinado de pasos o distancia manteniendo los pesos estables sin balanceos. El agarre, el core y el trapecio reciben un estímulo enorme solo por aguantar el peso mientras caminas. Es uno de los ejercicios más funcionales que existen. Para hacerlo más difícil usa pesos más pesados o camina sobre superficies irregulares."
+  },
+  {
+    "name": "Jump squats",
+    "mainGroup": "Cuerpo Completo",
+    "musclesUsed": "Piernas",
+    "difficulty": "Intermedio",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Similar a la sentadilla con salto, este ejercicio enfatiza la máxima potencia vertical. Baja rápidamente a la posición de sentadilla y en el momento en que empiezas a subir, explota al máximo buscando la mayor altura posible. Extiende completamente tobillos, rodillas y caderas en el aire. Aterriza con las puntas primero y absorbe el impacto doblando inmediatamente las rodillas para amortiguar y encadenar la siguiente repetición. Trabaja la potencia del tren inferior y el sistema nervioso central. No recomendado para personas con problemas de rodilla."
+  },
+  {
+    "name": "Bear crawl",
+    "mainGroup": "Cuerpo Completo",
+    "musclesUsed": "Core, hombros",
+    "difficulty": "Intermedio",
+    "equipment": "Peso corporal",
+    "isCustom": false,
+    "instructions": "Colócate en cuadrupedia con las rodillas despegadas del suelo unos 5 centímetros. Las manos están bajo los hombros y las rodillas bajo las caderas. Mantén la espalda plana y el core activo. Avanza moviendo simultáneamente la mano derecha con el pie izquierdo, luego la mano izquierda con el pie derecho. Las rodillas no tocan el suelo en ningún momento. Puedes avanzar hacia adelante, hacia atrás o lateralmente. Es un ejercicio de coordinación y estabilidad que trabaja el core de forma dinámica y los hombros de forma continua."
+  },
+  {
+    "name": "Lunge + curl",
+    "mainGroup": "Cuerpo Completo",
+    "musclesUsed": "Piernas, bíceps",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "De pie con una mancuerna en cada mano. Da una zancada hacia adelante bajando la rodilla trasera y simultáneamente realiza un curl de bíceps llevando las mancuernas hacia los hombros. Vuelve a la posición inicial bajando los brazos. Alterna piernas en cada repetición. Combinar dos movimientos aumenta la demanda cardiovascular, ahorra tiempo de entrenamiento y mejora la coordinación intermuscular. Elige un peso que te permita hacer ambos movimientos con buena técnica, generalmente más ligero de lo que usarías en el curl aislado."
+  },
+  {
+    "name": "Sentadilla + press",
+    "mainGroup": "Cuerpo Completo",
+    "musclesUsed": "Full body",
+    "difficulty": "Intermedio",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "De pie con las mancuernas a la altura de los hombros. Baja a la sentadilla manteniendo el torso erguido y al subir empuja las mancuernas hacia arriba realizando un press militar hasta extender los codos. Baja las mancuernas a los hombros mientras bajas de vuelta a la sentadilla. A diferencia del thruster, en este ejercicio los dos movimientos están algo más diferenciados aunque el objetivo es encadenarlos de forma fluida. Es una combinación eficiente que trabaja prácticamente todo el cuerpo y tiene alto gasto calórico."
+  },
+  {
+    "name": "Curl de muñeca",
+    "mainGroup": "Antebrazo",
+    "musclesUsed": "Antebrazo",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "Siéntate en un banco y apoya el antebrazo sobre el muslo o el banco con la muñeca sobresaliendo del borde y la palma hacia arriba. Sujeta una mancuerna ligera y deja que la muñeca caiga hacia abajo por el peso, luego flexiónala hacia arriba tan alto como puedas apretando los flexores del antebrazo. Baja muy lentamente para trabajar también la fase excéntrica. Usa siempre poco peso ya que los músculos del antebrazo son pequeños y propensos a la sobrecarga si se abusa del peso. Trabaja ambos lados por igual."
+  },
+  {
+    "name": "Curl inverso de muñeca",
+    "mainGroup": "Antebrazo",
+    "musclesUsed": "Antebrazo",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "Idéntico al curl de muñeca pero con la palma mirando hacia abajo. Apoya el antebrazo con el dorso de la mano hacia arriba y sube la mano elevando los nudillos hacia el techo. Este movimiento trabaja los extensores del antebrazo, que generalmente están mucho menos desarrollados que los flexores. El desequilibrio entre flexores y extensores es una de las causas más comunes de la epicondilitis o codo de tenista. Trabaja este ejercicio con regularidad para prevenir lesiones y mejorar la salud del codo."
+  },
+  {
+    "name": "Farmer carry",
+    "mainGroup": "Antebrazo",
+    "musclesUsed": "Agarre",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas o Pesas",
+    "isCustom": false,
+    "instructions": "Sujeta pesos pesados en ambas manos y camina manteniendo el torso erguido. La diferencia con el farmer walk es que aquí el foco está en la resistencia del agarre específicamente. Usa las cargas más pesadas que puedas sujetar manteniendo una postura correcta. Cuando sientas que el agarre flaquea, descansa y vuelve a intentarlo. Puedes hacerlo con mancuernas, kettlebells o cualquier objeto pesado. La fuerza de agarre es uno de los mejores indicadores de salud general y longevidad según múltiples estudios científicos."
+  },
+  {
+    "name": "Dead hang",
+    "mainGroup": "Antebrazo",
+    "musclesUsed": "Agarre",
+    "difficulty": "Principiante",
+    "equipment": "Barra de dominadas",
+    "isCustom": false,
+    "instructions": "Cuelga de una barra con los brazos completamente extendidos y el agarre prono o supino a la anchura de los hombros. Deja que el peso del cuerpo estire suavemente los hombros y la espalda. Mantén la posición el mayor tiempo posible antes de que el agarre ceda. Además de trabajar el agarre y el antebrazo, el dead hang es excelente para la descompresión de la columna vertebral y la movilidad del hombro. Practica varias series al día acumulando tiempo total y verás cómo tu agarre mejora rápidamente."
+  },
+  {
+    "name": "Pinch grip",
+    "mainGroup": "Antebrazo",
+    "musclesUsed": "Agarre",
+    "difficulty": "Intermedio",
+    "equipment": "Discos",
+    "isCustom": false,
+    "instructions": "Sujeta uno o varios discos de peso por el borde usando solo el pulgar y los dedos, sin apoyar la palma. Sostén el peso el mayor tiempo posible o camina con él. Este tipo de agarre trabaja específicamente los músculos del pulgar y los flexores de los dedos de forma muy diferente al agarre en barra. Empieza con discos lisos de poco peso ya que es mucho más difícil de lo que parece. El pinch grip tiene aplicaciones directas en deportes de escalada, lucha y cualquier actividad que requiera sujetar objetos de forma no convencional."
+  },
+  {
+    "name": "Curl martillo (Antebrazo)",
+    "mainGroup": "Antebrazo",
+    "musclesUsed": "Antebrazo",
+    "difficulty": "Principiante",
+    "equipment": "Mancuernas",
+    "isCustom": false,
+    "instructions": "Realiza el curl martillo estándar con palmas enfrentadas pero centrándote en el trabajo del antebrazo y el braquiorradial. Mantén la muñeca completamente neutra y rígida durante el movimiento para transferir toda la tensión al antebrazo. Baja de forma muy lenta en 4-5 segundos para maximizar el estímulo excéntrico en los músculos del antebrazo. Este ejercicio es uno de los más completos para el antebrazo ya que trabaja el braquiorradial, el braquial y en menor medida el bíceps con un patrón de movimiento muy natural y seguro para el codo."
+  },
+  {
+    "name": "Extensión de muñeca con banda",
+    "mainGroup": "Antebrazo",
+    "musclesUsed": "Antebrazo",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Ancla la banda en el suelo o pisa con el pie. Apoya el antebrazo en el muslo con el dorso de la mano hacia arriba sujetando la banda. Extiende la muñeca elevando los nudillos contra la resistencia de la banda. La banda proporciona una resistencia progresiva que se adapta al rango de movimiento de la muñeca. Baja lentamente. Es ideal para la rehabilitación del codo de tenista y para fortalecer los extensores del antebrazo que suelen ser el grupo débil en la mayoría de personas."
+  },
+  {
+    "name": "Flexión de muñeca con banda",
+    "mainGroup": "Antebrazo",
+    "musclesUsed": "Antebrazo",
+    "difficulty": "Principiante",
+    "equipment": "Banda elástica",
+    "isCustom": false,
+    "instructions": "Con la banda anclada frente a ti o pisada, apoya el antebrazo en el muslo con la palma hacia arriba sujetando la banda. Flexiona la muñeca hacia arriba contra la resistencia, apretando los flexores del antebrazo en la posición alta. Baja lentamente controlando la tensión. Complementario a la extensión de muñeca, este ejercicio trabaja los flexores que son los músculos principales del agarre. La combinación de ambas variantes con banda crea un programa completo y equilibrado para el antebrazo que previene lesiones por sobreuso."
+  },
+  {
+    "name": "Squeeze con pelota",
+    "mainGroup": "Antebrazo",
+    "musclesUsed": "Agarre",
+    "difficulty": "Principiante",
+    "equipment": "Pelota antiestrés",
+    "isCustom": false,
+    "instructions": "Sujeta una pelota antiestrés o de tenis en la mano y apriétala tan fuerte como puedas durante 3-5 segundos, luego suelta lentamente. Repite el número de repeticiones indicado antes de cambiar de mano. Puedes realizar el squeeze de forma estática aguantando la contracción o de forma rítmica apretando y soltando continuamente. Aunque parece un ejercicio sencillo, trabajado con consistencia mejora significativamente la fuerza del agarre y la resistencia de los músculos intrínsecos de la mano, beneficioso para cualquier deporte o actividad cotidiana."
+  },
+  {
+    "name": "Rotación de muñeca con mancuerna",
+    "mainGroup": "Antebrazo",
+    "musclesUsed": "Antebrazo",
+    "difficulty": "Principiante",
+    "equipment": "Mancuerna",
+    "isCustom": false,
+    "instructions": "Siéntate y apoya el antebrazo en el muslo o en el borde del banco con la mano sobresaliendo. Sujeta una mancuerna ligera y rota la muñeca de lado a lado, llevando la palma hacia arriba y luego hacia abajo de forma alternada. El movimiento debe ser controlado y en rango completo de pronosupinación. Este ejercicio trabaja los músculos pronador redondo y supinador que controlan la rotación del antebrazo, fundamentales para actividades como el tenis, escalada, o cualquier movimiento que involucre el giro de la mano."
+  }
+]

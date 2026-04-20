@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "961115677843",
+    "project_id": "fitforge-f1476",
+    "storage_bucket": "fitforge-f1476.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:961115677843:android:8dcda006b666ead874d966",
+        "android_client_info": {
+          "package_name": "com.gymflow"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "961115677843-gmf8dk6pnhvh3i14kevjcdjgs2jgre8a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gymflow",
+            "certificate_hash": "8f225a7f7b38d5e30461fd345e6e630f390b5688"
+          }
+        },
+        {
+          "client_id": "961115677843-no9vf5lk0g2fdbs2igir8u5u4fkee5l2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAiiEC_scwltXYWyn34R-K4xCxEASLwVaw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "961115677843-no9vf5lk0g2fdbs2igir8u5u4fkee5l2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
