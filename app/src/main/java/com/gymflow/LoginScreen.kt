@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -110,7 +111,7 @@ fun LoginScreen(
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "GymFlow",
+                        stringResource(R.string.app_name),
                         color = AccentWhite,
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Black,
@@ -118,7 +119,7 @@ fun LoginScreen(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Tu entrenamiento, tu ritmo",
+                        stringResource(R.string.app_tagline),
                         color = TextSecondary,
                         fontSize = 14.sp
                     )
@@ -146,7 +147,7 @@ fun LoginScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "Entrar",
+                        stringResource(R.string.login_tab_enter),
                         color = if (!isRegistering) AccentCyan else TextSecondary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
@@ -164,7 +165,7 @@ fun LoginScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "Registro",
+                        stringResource(R.string.login_tab_register),
                         color = if (isRegistering) AccentCyan else TextSecondary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
@@ -178,7 +179,7 @@ fun LoginScreen(
             if (isRegistering) {
                 OutlinedTextField(
                     value = name, onValueChange = { name = it },
-                    label = { Text("Nombre Completo") },
+                    label = { Text(stringResource(R.string.login_full_name)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     singleLine = true,
@@ -189,7 +190,7 @@ fun LoginScreen(
 
             OutlinedTextField(
                 value = email, onValueChange = { email = it },
-                label = { Text("Email") },
+                label = { Text(stringResource(R.string.login_email)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
@@ -199,7 +200,7 @@ fun LoginScreen(
 
             OutlinedTextField(
                 value = password, onValueChange = { password = it },
-                label = { Text("Contraseña") },
+                label = { Text(stringResource(R.string.login_password)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -226,12 +227,15 @@ fun LoginScreen(
                     onCheckedChange = { if(!isRegistering) rememberMe = it },
                     colors = CheckboxDefaults.colors(checkedColor = AccentCyan, uncheckedColor = Color.DarkGray)
                 )
-                Text("Recordar sesión", color = TextSecondary, fontSize = 13.sp)
+                Text(stringResource(R.string.login_remember), color = TextSecondary, fontSize = 13.sp)
             }
 
             Spacer(Modifier.height(20.dp))
 
             // Botón principal
+            val loadingStr    = stringResource(R.string.login_loading)
+            val createStr     = stringResource(R.string.login_create_account)
+            val enterStr      = stringResource(R.string.login_enter)
             Button(
                 onClick = {
                     val fE = email.trim(); val fP = password.trim()
@@ -276,7 +280,7 @@ fun LoginScreen(
                     Spacer(Modifier.width(12.dp))
                 }
                 Text(
-                    if (isLoading) "CARGANDO..." else if (isRegistering) "CREAR CUENTA" else "ENTRAR",
+                    if (isLoading) loadingStr else if (isRegistering) createStr else enterStr,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 16.sp
                 )
@@ -290,7 +294,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 HorizontalDivider(modifier = Modifier.weight(1f), color = Color.DarkGray.copy(alpha = 0.5f))
-                Text("  o  ", color = TextSecondary, fontSize = 12.sp)
+                Text("  ${stringResource(R.string.login_or)}  ", color = TextSecondary, fontSize = 12.sp)
                 HorizontalDivider(modifier = Modifier.weight(1f), color = Color.DarkGray.copy(alpha = 0.5f))
             }
 
@@ -306,7 +310,7 @@ fun LoginScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Login, null, tint = Color.White)
                     Spacer(Modifier.width(12.dp))
-                    Text("ENTRAR CON GOOGLE", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.login_google), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -53,14 +54,21 @@ fun CalendarScreen(
         }
     }
 
+    val calTitle      = stringResource(R.string.cal_title)
+    val calSubtitle   = stringResource(R.string.cal_subtitle)
+    val noRoutinesStr = stringResource(R.string.cal_no_routines)
+    val addHintStr    = stringResource(R.string.cal_add_hint)
+    val fabDescStr    = stringResource(R.string.cal_fab_desc)
+    val routinesDayFmt = stringResource(R.string.cal_routines_day)
+
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
         Column(modifier = Modifier.fillMaxSize()) {
 
             // ── Header ────────────────────────────────────────────────────────
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 Spacer(Modifier.height(40.dp))
-                Text("Calendario", color = AccentWhite, fontSize = 42.sp, fontWeight = FontWeight.Black)
-                Text("Planifica tus entrenamientos", color = TextSecondary, fontSize = 14.sp)
+                Text(calTitle, color = AccentWhite, fontSize = 42.sp, fontWeight = FontWeight.Black)
+                Text(calSubtitle, color = TextSecondary, fontSize = 14.sp)
                 Spacer(Modifier.height(24.dp))
             }
 
@@ -83,7 +91,7 @@ fun CalendarScreen(
                 calLabel.get(Calendar.YEAR)
             )
             Text(
-                "Rutinas · $dayLabel",
+                routinesDayFmt.format(dayLabel),
                 color      = TextSecondary,
                 fontWeight = FontWeight.Bold,
                 fontSize   = 12.sp,
@@ -108,9 +116,9 @@ fun CalendarScreen(
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(Modifier.height(12.dp))
-                        Text("Sin rutinas para este día", color = TextSecondary, fontSize = 14.sp)
+                        Text(noRoutinesStr, color = TextSecondary, fontSize = 14.sp)
                         Text(
-                            "Pulsa + para programar una",
+                            addHintStr,
                             color    = TextSecondary.copy(alpha = 0.6f),
                             fontSize = 12.sp
                         )
@@ -136,7 +144,7 @@ fun CalendarScreen(
             contentColor   = Color.Black,
             modifier       = Modifier.align(Alignment.BottomEnd).padding(24.dp)
         ) {
-            Icon(Icons.Default.Add, "Programar rutina")
+            Icon(Icons.Default.Add, fabDescStr)
         }
     }
 
@@ -160,9 +168,9 @@ fun CalendarScreen(
 @Composable
 fun ScheduleCard(schedule: ScheduledRoutine, onDelete: () -> Unit) {
     val recLabel = when (schedule.recurrenceType) {
-        RecurrenceType.ONCE         -> "Una vez"
-        RecurrenceType.EVERY_N_DAYS -> "Cada ${schedule.intervalDays} días"
-        RecurrenceType.WEEKLY_DAY   -> "Cada ${weekDayName(schedule.weekDay)}"
+        RecurrenceType.ONCE         -> stringResource(R.string.schedule_rec_once)
+        RecurrenceType.EVERY_N_DAYS -> stringResource(R.string.schedule_rec_every_n, schedule.intervalDays)
+        RecurrenceType.WEEKLY_DAY   -> stringResource(R.string.schedule_rec_weekly, weekDayNameLocalized(schedule.weekDay))
         else                        -> ""
     }
 
@@ -233,8 +241,22 @@ fun MonthlyCalendar(
     }
 
     val monthNames = arrayOf(
-        "Enero","Febrero","Marzo","Abril","Mayo","Junio",
-        "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
+        stringResource(R.string.month_jan), stringResource(R.string.month_feb),
+        stringResource(R.string.month_mar), stringResource(R.string.month_apr),
+        stringResource(R.string.month_may), stringResource(R.string.month_jun),
+        stringResource(R.string.month_jul), stringResource(R.string.month_aug),
+        stringResource(R.string.month_sep), stringResource(R.string.month_oct),
+        stringResource(R.string.month_nov), stringResource(R.string.month_dec)
+    )
+
+    val weekdayHeaders = listOf(
+        stringResource(R.string.weekday_header_mon),
+        stringResource(R.string.weekday_header_tue),
+        stringResource(R.string.weekday_header_wed),
+        stringResource(R.string.weekday_header_thu),
+        stringResource(R.string.weekday_header_fri),
+        stringResource(R.string.weekday_header_sat),
+        stringResource(R.string.weekday_header_sun)
     )
 
     Column(modifier = Modifier.padding(horizontal = 24.dp)) {
@@ -263,7 +285,7 @@ fun MonthlyCalendar(
 
         // ── Días de semana ────────────────────────────────────────────────────
         Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("L","M","X","J","V","S","D").forEach { h ->
+            weekdayHeaders.forEach { h ->
                 Text(
                     h,
                     modifier   = Modifier.weight(1f),
@@ -364,6 +386,20 @@ fun ScheduleDialog(
             add(Calendar.MONTH, durationMonths)
         }.timeInMillis
 
+    val titleStr       = stringResource(R.string.schedule_title)
+    val routineLbl     = stringResource(R.string.schedule_routine_label)
+    val noRoutinesStr  = stringResource(R.string.schedule_no_routines)
+    val startDateLbl   = stringResource(R.string.schedule_start_date)
+    val hourLbl        = stringResource(R.string.schedule_hour)
+    val recurrenceLbl  = stringResource(R.string.schedule_recurrence)
+    val onceStr        = stringResource(R.string.schedule_once)
+    val everyNStr      = stringResource(R.string.schedule_every_n)
+    val weeklyStr      = stringResource(R.string.schedule_weekly)
+    val everyNDaysLbl  = stringResource(R.string.schedule_every_n_days)
+    val weekdayLbl     = stringResource(R.string.schedule_weekday)
+    val cancelStr      = stringResource(R.string.schedule_cancel)
+    val saveStr        = stringResource(R.string.schedule_save)
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(24.dp), color = Color(0xFF111111)) {
             LazyColumn(
@@ -372,12 +408,12 @@ fun ScheduleDialog(
             ) {
                 // ── Título ──────────────────────────────────────────────────
                 item {
-                    Text("Programar rutina", color = AccentWhite, fontWeight = FontWeight.Black, fontSize = 20.sp)
+                    Text(titleStr, color = AccentWhite, fontWeight = FontWeight.Black, fontSize = 20.sp)
                 }
 
                 // ── Selector de rutina ──────────────────────────────────────
                 item {
-                    Text("Rutina", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(routineLbl, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
                     Box {
                         OutlinedButton(
@@ -387,7 +423,7 @@ fun ScheduleDialog(
                             border   = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
                         ) {
                             Text(
-                                selectedRoutine?.name ?: "Sin rutinas creadas",
+                                selectedRoutine?.name ?: noRoutinesStr,
                                 modifier  = Modifier.weight(1f),
                                 textAlign = TextAlign.Start,
                                 color     = TextPrimary
@@ -416,7 +452,7 @@ fun ScheduleDialog(
                         dateCal.get(Calendar.MONTH) + 1,
                         dateCal.get(Calendar.YEAR)
                     )
-                    Text("Fecha de inicio", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(startDateLbl, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
                     OutlinedButton(
                         onClick  = {
@@ -446,7 +482,7 @@ fun ScheduleDialog(
 
                 // ── Hora de notificación ────────────────────────────────────
                 item {
-                    Text("Hora de la notificación", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(hourLbl, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
                     OutlinedButton(
                         onClick  = {
@@ -473,13 +509,13 @@ fun ScheduleDialog(
 
                 // ── Tipo de recurrencia ─────────────────────────────────────
                 item {
-                    Text("Repetición", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(recurrenceLbl, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
-                            RecurrenceType.ONCE         to "Una vez",
-                            RecurrenceType.EVERY_N_DAYS to "Cada X días",
-                            RecurrenceType.WEEKLY_DAY   to "Semanal"
+                            RecurrenceType.ONCE         to onceStr,
+                            RecurrenceType.EVERY_N_DAYS to everyNStr,
+                            RecurrenceType.WEEKLY_DAY   to weeklyStr
                         ).forEach { (type, label) ->
                             FilterChip(
                                 selected = recurrence == type,
@@ -500,7 +536,7 @@ fun ScheduleDialog(
                 item {
                     AnimatedVisibility(recurrence == RecurrenceType.EVERY_N_DAYS, enter = fadeIn(), exit = fadeOut()) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Cada cuántos días", color = TextSecondary, fontSize = 12.sp)
+                            Text(everyNDaysLbl, color = TextSecondary, fontSize = 12.sp)
                             Row(
                                 verticalAlignment    = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -519,7 +555,7 @@ fun ScheduleDialog(
                     Spacer(Modifier.height(0.dp)) // fuerza recomposición entre las dos animaciones
                     AnimatedVisibility(recurrence == RecurrenceType.WEEKLY_DAY, enter = fadeIn(), exit = fadeOut()) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Día de la semana", color = TextSecondary, fontSize = 12.sp)
+                            Text(weekdayLbl, color = TextSecondary, fontSize = 12.sp)
                             WeekDaySelector(weekDaySelected) { weekDaySelected = it }
                             Spacer(Modifier.height(4.dp))
                             DurationPicker(durationMonths) { durationMonths = it }
@@ -536,7 +572,7 @@ fun ScheduleDialog(
                             shape    = RoundedCornerShape(14.dp),
                             border   = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
                         ) {
-                            Text("Cancelar", color = TextSecondary)
+                            Text(cancelStr, color = TextSecondary)
                         }
                         Button(
                             onClick  = {
@@ -562,7 +598,7 @@ fun ScheduleDialog(
                                 contentColor   = Color.Black
                             )
                         ) {
-                            Text("Guardar", fontWeight = FontWeight.Bold)
+                            Text(saveStr, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -575,13 +611,13 @@ fun ScheduleDialog(
 @Composable
 fun WeekDaySelector(selected: Int, onSelect: (Int) -> Unit) {
     val days = listOf(
-        Calendar.MONDAY    to "L",
-        Calendar.TUESDAY   to "M",
-        Calendar.WEDNESDAY to "X",
-        Calendar.THURSDAY  to "J",
-        Calendar.FRIDAY    to "V",
-        Calendar.SATURDAY  to "S",
-        Calendar.SUNDAY    to "D"
+        Calendar.MONDAY    to stringResource(R.string.weekday_sel_mon),
+        Calendar.TUESDAY   to stringResource(R.string.weekday_sel_tue),
+        Calendar.WEDNESDAY to stringResource(R.string.weekday_sel_wed),
+        Calendar.THURSDAY  to stringResource(R.string.weekday_sel_thu),
+        Calendar.FRIDAY    to stringResource(R.string.weekday_sel_fri),
+        Calendar.SATURDAY  to stringResource(R.string.weekday_sel_sat),
+        Calendar.SUNDAY    to stringResource(R.string.weekday_sel_sun)
     )
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         days.forEach { (calDay, label) ->
@@ -607,15 +643,17 @@ fun WeekDaySelector(selected: Int, onSelect: (Int) -> Unit) {
 // ── Selector de duración en meses ─────────────────────────────────────────────
 @Composable
 fun DurationPicker(months: Int, onMonthsChange: (Int) -> Unit) {
+    val durationStr = stringResource(R.string.schedule_duration)
+    val monthsStr   = stringResource(R.string.schedule_months, months)
     Row(
         verticalAlignment    = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text("Durante", color = TextSecondary, fontSize = 12.sp)
+        Text(durationStr, color = TextSecondary, fontSize = 12.sp)
         IconButton(onClick = { if (months > 1) onMonthsChange(months - 1) }) {
             Icon(Icons.Default.Remove, null, tint = AccentCyan, modifier = Modifier.size(18.dp))
         }
-        Text("$months meses", color = TextPrimary, fontWeight = FontWeight.Bold)
+        Text(monthsStr, color = TextPrimary, fontWeight = FontWeight.Bold)
         IconButton(onClick = { if (months < 24) onMonthsChange(months + 1) }) {
             Icon(Icons.Default.Add, null, tint = AccentCyan, modifier = Modifier.size(18.dp))
         }
@@ -682,6 +720,8 @@ fun buildCalendarCells(year: Int, month: Int): List<Long> {
     return cells
 }
 
+/** Nombre del día de semana usando strings localizados (solo para uso en funciones puras — 
+ *  debe llamarse desde un contexto que ya tenga el locale correcto). */
 fun weekDayName(calDay: Int): String = when (calDay) {
     Calendar.MONDAY    -> "lunes"
     Calendar.TUESDAY   -> "martes"
@@ -690,5 +730,18 @@ fun weekDayName(calDay: Int): String = when (calDay) {
     Calendar.FRIDAY    -> "viernes"
     Calendar.SATURDAY  -> "sábado"
     Calendar.SUNDAY    -> "domingo"
+    else               -> "?"
+}
+
+/** Versión @Composable del nombre del día — usa stringResource para localización correcta. */
+@Composable
+fun weekDayNameLocalized(calDay: Int): String = when (calDay) {
+    Calendar.MONDAY    -> stringResource(R.string.weekday_monday)
+    Calendar.TUESDAY   -> stringResource(R.string.weekday_tuesday)
+    Calendar.WEDNESDAY -> stringResource(R.string.weekday_wednesday)
+    Calendar.THURSDAY  -> stringResource(R.string.weekday_thursday)
+    Calendar.FRIDAY    -> stringResource(R.string.weekday_friday)
+    Calendar.SATURDAY  -> stringResource(R.string.weekday_saturday)
+    Calendar.SUNDAY    -> stringResource(R.string.weekday_sunday)
     else               -> "?"
 }

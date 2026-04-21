@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,17 +41,24 @@ fun EditRoutineScreen(
         else if (preselectedExercises != null) addAll(preselectedExercises) 
     } }
 
+    val titleStr     = stringResource(if (initialRoutine != null) R.string.edit_routine_title else R.string.new_routine_title)
+    val saveStr      = stringResource(R.string.routine_save)
+    val nameLabelStr = stringResource(R.string.routine_name_label)
+    val exercisesStr = stringResource(R.string.routine_exercises)
+    val addMoreStr   = stringResource(R.string.routine_add_more)
+    val reorderStr   = stringResource(R.string.routine_reorder_hint)
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text(if (initialRoutine != null) "Editar Rutina" else "Nueva Rutina", color = AccentWhite, fontWeight = FontWeight.Bold) },
+                title = { Text(titleStr, color = AccentWhite, fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = AccentWhite) } },
                 actions = {
                     TextButton(onClick = { 
                         onSave(WorkoutSession(id = initialRoutine?.id ?: UUID.randomUUID().toString(), name = name, exercises = exercises.toMutableList())) 
                     }) {
-                        Text("GUARDAR", color = AccentCyan, fontWeight = FontWeight.Black)
+                        Text(saveStr, color = AccentCyan, fontWeight = FontWeight.Black)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -61,7 +69,7 @@ fun EditRoutineScreen(
             Spacer(Modifier.height(16.dp))
             OutlinedTextField(
                 value = name, onValueChange = { name = it },
-                label = { Text("Nombre de la rutina") },
+                label = { Text(nameLabelStr) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -74,18 +82,18 @@ fun EditRoutineScreen(
             )
             Spacer(Modifier.height(24.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("EJERCICIOS", color = TextSecondary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(exercisesStr, color = TextSecondary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 TextButton(onClick = onAddMore) {
                     Icon(Icons.Default.Add, null, tint = AccentCyan)
                     Spacer(Modifier.width(4.dp))
-                    Text("AÑADIR", color = AccentCyan, fontWeight = FontWeight.Bold)
+                    Text(addMoreStr, color = AccentCyan, fontWeight = FontWeight.Bold)
                 }
             }
 
             // Hint de drag & drop
             if (exercises.size > 1) {
                 Text(
-                    "Mantén pulsado ↕ para reordenar",
+                    reorderStr,
                     color = TextSecondary.copy(alpha = 0.5f),
                     fontSize = 11.sp,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -176,6 +184,11 @@ fun RoutineDetailScreen(
 ) {
     val context = LocalContext.current
     var showScheduleDialog by remember { mutableStateOf(false) }
+
+    val startStr    = stringResource(R.string.start_workout)
+    val continueStr = stringResource(R.string.continue_workout)
+    val exercisesStr = stringResource(R.string.routine_exercises)
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
@@ -195,7 +208,7 @@ fun RoutineDetailScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(horizontal = 24.dp)) {
             Spacer(Modifier.height(16.dp))
-            Text("EJERCICIOS", color = TextSecondary, fontWeight = FontWeight.Bold)
+            Text(exercisesStr, color = TextSecondary, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(16.dp))
             LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(routine.exercises) { ex ->
@@ -217,7 +230,7 @@ fun RoutineDetailScreen(
             }
             Spacer(Modifier.height(16.dp))
             ModernButton(
-                text = if (isActiveThis) "CONTINUAR ENTRENAMIENTO" else "INICIAR ENTRENAMIENTO",
+                text = if (isActiveThis) continueStr else startStr,
                 onClick = onStartWorkout,
                 modifier = Modifier.fillMaxWidth(),
                 containerColor = AccentCyan,

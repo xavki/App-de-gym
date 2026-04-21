@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -106,10 +107,34 @@ fun WorkoutScreen(
     
     val isCardio = definition?.mainGroup?.equals("cardio", ignoreCase = true) == true
 
-    // Usamos un SnapshotStateList para que Compose detecte cambios en la lista (añadir/quitar)
+    // ── Autocompletar desde última sesión ────────────────────────────────────
+    val lastSessionSets = remember(ex?.exerciseName) {
+        ex?.exerciseName?.let { name ->
+            viewModel.workoutHistory
+                .sortedByDescending { it.date }
+                .firstOrNull { session -> session.exercises.any { it.exerciseName == name } }
+                ?.exercises?.firstOrNull { it.exerciseName == name }
+                ?.sets?.filter { it.weight > 0 || it.repetitions > 0 }
+        } ?: emptyList()
+    }
+
+    // SnapshotStateList para que Compose detecte cambios
     val currentSets = remember(ex?.id) { 
         mutableStateListOf<ExerciseSet>().apply { 
-            ex?.sets?.let { addAll(it) } 
+            ex?.sets?.let { addAll(it) }
+            // Autocompletar valores de última sesión si los sets están vacíos
+            if (lastSessionSets.isNotEmpty()) {
+                forEachIndexed { i, set ->
+                    val prev = lastSessionSets.getOrNull(i)
+                    if (prev != null && set.weight == 0.0 && set.repetitions == 0) {
+                        this[i] = set.copy(weight = prev.weight, repetitions = prev.repetitions)
+                        ex?.sets?.getOrNull(i)?.also { s ->
+                            s.weight = prev.weight
+                            s.repetitions = prev.repetitions
+                        }
+                    }
+                }
+            }
         } 
     }
 
@@ -154,7 +179,7 @@ fun WorkoutScreen(
                     }
                 },
                 navigationIcon = { IconButton(onClick = onMinimize) { Icon(Icons.Default.ExpandMore, null, tint = AccentWhite) } },
-                actions = { TextButton(onClick = onFinish) { Text("FINALIZAR", color = AccentCyan, fontWeight = FontWeight.Black) } },
+                actions = { TextButton(onClick = onFinish) { Text(stringResource(R.string.workout_finish), color = AccentCyan, fontWeight = FontWeight.Black) } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
             )
         }
@@ -168,7 +193,7 @@ fun WorkoutScreen(
                     modifier = Modifier.padding(bottom = 12.dp)
                 ) {
                     Text(
-                        "Ejercicio ${currentIndex + 1} de ${routine.exercises.size}",
+                        stringResource(R.string.workout_exercise_of, currentIndex + 1, routine.exercises.size),
                         color = TextSecondary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -202,30 +227,79 @@ fun WorkoutScreen(
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                definition?.nameEs ?: ex.exerciseName, 
-                                color = TextPrimary, 
-                                fontSize = 28.sp, 
+                                definition?.nameEs ?: ex.exerciseName,
+                                color = TextPrimary,
+                                fontSize = 28.sp,
                                 fontWeight = FontWeight.Black,
                                 modifier = Modifier.weight(1f)
                             )
+                            // Calculadora 1RM
+                            var showOneRM by remember { mutableStateOf(false) }
+                            IconButton(onClick = { showOneRM = true }) {
+                                Icon(Icons.Default.Calculate, null, tint = AccentCyan.copy(alpha = 0.7f))
+                            }
                             IconButton(onClick = { showRestTimer = true }) {
                                 Icon(Icons.Default.Timer, null, tint = AccentCyan)
                             }
                             IconButton(onClick = { onInfoClick(ex) }) {
                                 Icon(Icons.Outlined.Info, null, tint = AccentCyan)
                             }
+                            if (showOneRM) {
+                                OneRMDialog(
+                                    exerciseName = ex.exerciseName,
+                                    currentOneRM  = viewModel.estimatedOneRM(ex.exerciseName),
+                                    onDismiss     = { showOneRM = false }
+                                )
+                            }
                         }
                         
                         Spacer(Modifier.height(16.dp))
-                        
+
+                        // ── Notas del ejercicio ─────────────────────────────
+                        var notesText by remember(ex.id) { mutableStateOf(ex.notes ?: "") }
+                        OutlinedTextField(
+                            value = notesText,
+                            onValueChange = { notesText = it; ex.notes = it },
+                            label = { Text("📝 Notas", fontSize = 11.sp) },
+                            placeholder = { Text("Técnica, sensaciones...", fontSize = 11.sp, color = TextSecondary.copy(alpha = 0.4f)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor   = AccentCyan.copy(alpha = 0.5f),
+                                unfocusedBorderColor = Color(0xFF1A2A2A),
+                                focusedTextColor     = TextPrimary,
+                                unfocusedTextColor   = TextPrimary,
+                                focusedLabelColor    = AccentCyan,
+                                unfocusedLabelColor  = TextSecondary,
+                                cursorColor          = AccentCyan
+                            )
+                        )
+                        Spacer(Modifier.height(12.dp))
+
+                        // ── Historial de la última sesión ────────────────────
+                        if (lastSessionSets.isNotEmpty()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.History, null, tint = TextSecondary, modifier = Modifier.size(12.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Última sesión: ", color = TextSecondary, fontSize = 11.sp)
+                                lastSessionSets.take(3).forEachIndexed { i, s ->
+                                    if (i > 0) Text(" · ", color = TextSecondary, fontSize = 11.sp)
+                                    Text("${s.weight}×${s.repetitions}", color = AccentCyan.copy(alpha = 0.7f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                if (lastSessionSets.size > 3) Text(" ...", color = TextSecondary, fontSize = 11.sp)
+                            }
+                            Spacer(Modifier.height(10.dp))
+                        }
+
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(if (isCardio) "SESIONES" else "SERIES", color = TextSecondary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text(stringResource(if (isCardio) R.string.workout_sessions else R.string.workout_sets), color = TextSecondary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                             TextButton(onClick = { 
                                 currentSets.add(ExerciseSet(id = UUID.randomUUID().toString())) 
                             }) {
                                 Icon(Icons.Default.Add, null, tint = AccentCyan, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("AÑADIR", color = AccentCyan, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.workout_add), color = AccentCyan, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -244,11 +318,39 @@ fun WorkoutScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(12.dp)
                             ) {
+                                // Badge de tipo de serie (pulsable para cambiar)
+                                var showSetTypePicker by remember { mutableStateOf(false) }
+                                val setTypeColor = when (set.setType) {
+                                    SetType.WARMUP   -> Color(0xFF888888)
+                                    SetType.DROP_SET -> Color(0xFFFF6B35)
+                                    SetType.FAILURE  -> Color(0xFF9C27B0)
+                                    else             -> if (set.isCompleted) AccentCyan else Color.DarkGray
+                                }
+                                val setTypeLabel = when (set.setType) {
+                                    SetType.WARMUP   -> "W"
+                                    SetType.DROP_SET -> "D"
+                                    SetType.FAILURE  -> "F"
+                                    else             -> "${index + 1}"
+                                }
                                 Box(
-                                    modifier = Modifier.size(28.dp).background(if(set.isCompleted) AccentCyan else Color.DarkGray, CircleShape),
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .background(setTypeColor, CircleShape)
+                                        .clickable { showSetTypePicker = true },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("${index + 1}", color = Color.Black, fontWeight = FontWeight.Bold)
+                                    Text(setTypeLabel, color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                                if (showSetTypePicker) {
+                                    SetTypePickerDialog(
+                                        current = set.setType,
+                                        onSelect = { newType ->
+                                            val idx2 = currentSets.indexOf(set)
+                                            if (idx2 != -1) currentSets[idx2] = currentSets[idx2].copy(setType = newType)
+                                            showSetTypePicker = false
+                                        },
+                                        onDismiss = { showSetTypePicker = false }
+                                    )
                                 }
                                 
                                 Spacer(Modifier.width(12.dp))
@@ -318,13 +420,18 @@ fun WorkoutScreen(
                                         val idx = currentSets.indexOf(set)
                                         if (idx != -1) {
                                             currentSets[idx] = currentSets[idx].copy(isCompleted = isChecked)
-                                            // 🔔 Sonido "ding" + check PR
                                             if (isChecked) {
                                                 playDingSound()
                                                 val w = currentSets[idx].weight
                                                 val r = currentSets[idx].repetitions
                                                 if (ex != null && viewModel.checkPersonalRecord(ex.exerciseName, w, r)) {
                                                     viewModel.newPersonalRecord = ex.exerciseName
+                                                }
+                                                // ⏱️ Auto-start rest timer
+                                                if (viewModel.autoRestTimer) {
+                                                    viewModel.restTimerSeconds = viewModel.defaultRestSeconds
+                                                    viewModel.restTimerRunning = true
+                                                    showRestTimer = true
                                                 }
                                             }
                                         }
@@ -377,7 +484,7 @@ fun WorkoutScreen(
                                 noteText = it
                                 ex.notes = it
                             },
-                            placeholder = { Text("Añadir nota... (ej: subir peso)", color = TextSecondary.copy(alpha = 0.5f), fontSize = 13.sp) },
+                            placeholder = { Text(stringResource(R.string.workout_add_note), color = TextSecondary.copy(alpha = 0.5f), fontSize = 13.sp) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
                             singleLine = false,
@@ -396,10 +503,13 @@ fun WorkoutScreen(
                         
                         Spacer(Modifier.height(16.dp))
                         
+                        val prevStr = stringResource(R.string.workout_previous)
+                        val nextStr = stringResource(R.string.workout_next)
+                        val endStr  = stringResource(R.string.workout_end)
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             if (currentIndex > 0) {
                                 ModernButton(
-                                    "ANTERIOR", 
+                                    prevStr, 
                                     onClick = { viewModel.activeWorkoutExerciseIndex-- }, 
                                     modifier = Modifier.weight(1f), 
                                     containerColor = SurfaceDark, 
@@ -407,7 +517,7 @@ fun WorkoutScreen(
                                 )
                             }
                             ModernButton(
-                                if (currentIndex < routine.exercises.size - 1) "SIGUIENTE" else "TERMINAR",
+                                if (currentIndex < routine.exercises.size - 1) nextStr else endStr,
                                 onClick = { 
                                     if (currentIndex < routine.exercises.size - 1) viewModel.activeWorkoutExerciseIndex++ else onFinish() 
                                 },
@@ -460,7 +570,7 @@ fun CardioTimerView(
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Black
             )
-            Text("TIEMPO", color = TextSecondary, fontSize = 10.sp)
+            Text(stringResource(R.string.workout_time), color = TextSecondary, fontSize = 10.sp)
         }
         
         Spacer(Modifier.width(16.dp))
@@ -513,7 +623,7 @@ fun RestTimerDialog(viewModel: GymFlowViewModel, onDismiss: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Timer, null, tint = AccentCyan, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Descanso", color = AccentWhite, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text(stringResource(R.string.rest_title), color = AccentWhite, fontWeight = FontWeight.Bold, fontSize = 20.sp)
             }
         },
         text = {
@@ -595,14 +705,14 @@ fun RestTimerDialog(viewModel: GymFlowViewModel, onDismiss: () -> Unit) {
                 }) {
                     Icon(Icons.Default.Refresh, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Reiniciar a 1:00", color = TextSecondary, fontSize = 13.sp)
+                    Text(stringResource(R.string.rest_reset), color = TextSecondary, fontSize = 13.sp)
                 }
             }
         },
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cerrar", color = TextSecondary, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.rest_close), color = TextSecondary, fontWeight = FontWeight.Bold)
             }
         }
     )
@@ -615,7 +725,8 @@ fun RestTimerDialog(viewModel: GymFlowViewModel, onDismiss: () -> Unit) {
 @Composable
 fun WorkoutSummaryScreen(
     summary: WorkoutSummaryData,
-    onDone: () -> Unit
+    onDone: () -> Unit,
+    onShare: (() -> Unit)? = null
 ) {
     val minutes = summary.durationSeconds / 60
     val seconds = summary.durationSeconds % 60
@@ -654,7 +765,7 @@ fun WorkoutSummaryScreen(
                 Spacer(Modifier.height(12.dp))
 
                 Text(
-                    "¡Buen trabajo!",
+                    stringResource(R.string.summary_great_job),
                     color = AccentWhite,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Black
@@ -670,17 +781,21 @@ fun WorkoutSummaryScreen(
                 Spacer(Modifier.height(32.dp))
 
                 // Estadísticas principales
+                val durationLbl  = stringResource(R.string.summary_duration)
+                val totalKgLbl   = stringResource(R.string.summary_total_kg)
+                val setsLbl      = stringResource(R.string.summary_sets)
+                val exercisesLbl = stringResource(R.string.summary_exercises)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     SummaryStatCard(
                         emoji = "⏱",
                         value = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds),
-                        label = "Duración",
+                        label = durationLbl,
                         modifier = Modifier.weight(1f)
                     )
                     SummaryStatCard(
                         emoji = "🏋️",
                         value = "${summary.totalVolume}",
-                        label = "Kg totales",
+                        label = totalKgLbl,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -689,13 +804,13 @@ fun WorkoutSummaryScreen(
                     SummaryStatCard(
                         emoji = "✅",
                         value = "${summary.totalSets}",
-                        label = "Series",
+                        label = setsLbl,
                         modifier = Modifier.weight(1f)
                     )
                     SummaryStatCard(
                         emoji = "💪",
                         value = "${summary.exercises.size}",
-                        label = "Ejercicios",
+                        label = exercisesLbl,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -716,7 +831,7 @@ fun WorkoutSummaryScreen(
                             Text("🔥", fontSize = 28.sp)
                             Spacer(Modifier.width(16.dp))
                             Column {
-                                Text("MEJOR SERIE", color = AccentCyan, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                                Text(stringResource(R.string.summary_best_set), color = AccentCyan, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                                 Spacer(Modifier.height(4.dp))
                                 val bestDefn = ExerciseRepository.getCached().find { it.name == bestSet.first }
                                 Text(
@@ -741,7 +856,7 @@ fun WorkoutSummaryScreen(
 
                 // Desglose por ejercicio
                 Text(
-                    "DESGLOSE",
+                    stringResource(R.string.summary_breakdown),
                     color = TextSecondary,
                     fontWeight = FontWeight.Black,
                     fontSize = 12.sp,
@@ -769,7 +884,7 @@ fun WorkoutSummaryScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Serie ${idx + 1}", color = TextSecondary, fontSize = 13.sp)
+                                    Text(stringResource(R.string.summary_set_n, idx + 1), color = TextSecondary, fontSize = 13.sp)
                                     Text(
                                         "${set.weight} kg × ${set.repetitions}",
                                         color = TextPrimary,
@@ -794,12 +909,29 @@ fun WorkoutSummaryScreen(
 
             item {
                 Spacer(Modifier.height(28.dp))
-                ModernButton(
-                    text = "VOLVER AL INICIO",
-                    onClick = onDone,
-                    modifier = Modifier.fillMaxWidth(),
-                    containerColor = AccentCyan
-                )
+                var showShare by remember { mutableStateOf(false) }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = { showShare = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentCyan.copy(alpha = 0.4f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentCyan)
+                    ) {
+                        Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.share_button), fontWeight = FontWeight.Bold)
+                    }
+                    ModernButton(
+                        text = stringResource(R.string.summary_back_home),
+                        onClick = onDone,
+                        modifier = Modifier.weight(1f),
+                        containerColor = AccentCyan
+                    )
+                }
+                if (showShare) {
+                    ShareWorkoutDialog(summary = summary, onDismiss = { showShare = false })
+                }
                 Spacer(Modifier.height(32.dp))
             }
         }
@@ -882,4 +1014,88 @@ fun ConfettiAnimation() {
         }
         if (tick > 0) { /* force recomposition */ }
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SetType Picker Dialog
+// ═══════════════════════════════════════════════════════════════════════════════
+@Composable
+fun SetTypePickerDialog(
+    current: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val types = listOf(
+        Triple(SetType.NORMAL,   stringResource(R.string.set_type_normal),   AccentCyan),
+        Triple(SetType.WARMUP,   stringResource(R.string.set_type_warmup),   Color(0xFF888888)),
+        Triple(SetType.DROP_SET, stringResource(R.string.set_type_dropset),  Color(0xFFFF6B35)),
+        Triple(SetType.FAILURE,  stringResource(R.string.set_type_failure),  Color(0xFF9C27B0))
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Text(
+                stringResource(R.string.set_picker_title),
+                color = AccentWhite,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                types.forEach { (type, label, color) ->
+                    val isSelected = current == type
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable { onSelect(type) },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected) color.copy(alpha = 0.15f) else Color(0xFF0A0A0A)
+                        ),
+                        border = BorderStroke(1.dp, if (isSelected) color else Color(0xFF1A1A1A))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier.size(28.dp).background(color, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    when (type) {
+                                        SetType.WARMUP   -> "W"
+                                        SetType.DROP_SET -> "D"
+                                        SetType.FAILURE  -> "F"
+                                        else             -> "N"
+                                    },
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Text(
+                                label,
+                                color = if (isSelected) color else TextPrimary,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 15.sp
+                            )
+                            if (isSelected) {
+                                Spacer(Modifier.weight(1f))
+                                Icon(Icons.Default.CheckCircle, null, tint = color, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.settings_close), color = TextSecondary)
+            }
+        }
+    )
 }

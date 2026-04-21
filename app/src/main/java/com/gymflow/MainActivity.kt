@@ -30,7 +30,8 @@ import androidx.credentials.GetCredentialRequest
 import kotlinx.coroutines.launch
 
 enum class Screen {
-    LOGIN, HOME, SELECT_EXERCISES, CREATE_ROUTINE, EDIT_ROUTINE, ROUTINE_DETAILS, EXERCISE_DETAIL, WORKOUT, EXERCISE_INFO, WORKOUT_SUMMARY
+    LOGIN, HOME, SELECT_EXERCISES, CREATE_ROUTINE, EDIT_ROUTINE, ROUTINE_DETAILS,
+    EXERCISE_DETAIL, WORKOUT, EXERCISE_INFO, WORKOUT_SUMMARY, PR_BOARD, EXERCISE_PROGRESS
 }
 
 class MainActivity : ComponentActivity() {
@@ -184,7 +185,9 @@ fun GymFlowApp(
                 }
             )
             Screen.SELECT_EXERCISES -> ExerciseSelectionScreen(
-                exercises = firestoreExercises,
+                exercises = firestoreExercises + viewModel.customExercises.map { c ->
+                    ExerciseDefinition(name = c.name, mainGroup = c.mainGroup, musclesUsed = c.musclesUsed, equipment = c.equipment, nameEs = c.name)
+                },
                 isLoading = isLoadingExercises,
                 alreadySelected = if (viewModel.selectedRoutine != null) viewModel.selectedRoutine!!.exercises.map { it.exerciseName } else viewModel.tempExercises.map { it.exerciseName },
                 onExercisesSelected = { names ->
@@ -212,7 +215,8 @@ fun GymFlowApp(
                     viewModel.selectedExercise = WorkoutExercise(exerciseName = name)
                     previousScreen = currentScreen
                     currentScreen = Screen.EXERCISE_INFO
-                }
+                },
+                onCreateCustom = { custom -> viewModel.saveCustomExercise(custom) }
             )
             Screen.CREATE_ROUTINE, Screen.EDIT_ROUTINE -> {
                 EditRoutineScreen(
@@ -302,9 +306,24 @@ fun GymFlowApp(
             Screen.WORKOUT_SUMMARY -> viewModel.lastWorkoutSummary?.let { summary ->
                 WorkoutSummaryScreen(
                     summary = summary,
-                    onDone  = { currentScreen = Screen.HOME }
+                    onDone  = { currentScreen = Screen.HOME },
+                    onShare = {
+                        // El botón compartir existe en WorkoutSummaryScreen y abre ShareWorkoutDialog
+                    }
                 )
             } ?: run { currentScreen = Screen.HOME }
+            Screen.PR_BOARD -> PRBoardScreen(
+                viewModel = viewModel,
+                onBack = { currentScreen = Screen.HOME }
+            )
+            Screen.EXERCISE_PROGRESS -> {
+                val exName = viewModel.selectedExercise?.exerciseName ?: ""
+                ExerciseProgressScreen(
+                    exerciseName = exName,
+                    viewModel = viewModel,
+                    onBack = { currentScreen = previousScreen ?: Screen.HOME }
+                )
+            }
         }
     }
 }

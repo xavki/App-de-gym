@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import androidx.compose.material.icons.filled.Build
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -42,12 +44,14 @@ fun ExerciseSelectionScreen(
     alreadySelected: List<String>,
     onExercisesSelected: (List<String>) -> Unit,
     onBack: () -> Unit,
-    onInfoClick: (String) -> Unit
+    onInfoClick: (String) -> Unit,
+    onCreateCustom: ((CustomExercise) -> Unit)? = null
 ) {
     val selected = remember { mutableStateListOf<String>().apply { addAll(alreadySelected) } }
     var searchQuery by remember { mutableStateOf("") }
     val selectedFilters = remember { mutableStateListOf<String>() }
     var filtersExpanded by remember { mutableStateOf(false) }
+    var showCreateDialog by remember { mutableStateOf(false) }
     
     // Lista fija de categorías (traducidas al español)
     val categories = listOf(
@@ -100,12 +104,16 @@ fun ExerciseSelectionScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Añadir Ejercicios", color = AccentWhite, fontWeight = FontWeight.Bold) },
-                navigationIcon = { 
-                    IconButton(onClick = onBack) { 
-                        Icon(Icons.Default.Close, null, tint = AccentWhite) 
-                    } 
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.Close, null, tint = AccentWhite)
+                    }
                 },
                 actions = {
+                    // Botón crear ejercicio personalizado
+                    IconButton(onClick = { showCreateDialog = true }) {
+                        Icon(Icons.Default.Build, null, tint = AccentCyan)
+                    }
                     TextButton(onClick = { onExercisesSelected(selected.toList()) }) {
                         Text("LISTO", color = AccentCyan, fontWeight = FontWeight.ExtraBold)
                     }
@@ -319,6 +327,17 @@ fun ExerciseSelectionScreen(
                 }
             }
         }
+    }
+
+    // Dialog para crear ejercicio personalizado
+    if (showCreateDialog) {
+        CreateExerciseDialog(
+            onDismiss = { showCreateDialog = false },
+            onSave = { custom ->
+                onCreateCustom?.invoke(custom)
+                showCreateDialog = false
+            }
+        )
     }
 }
 
@@ -711,9 +730,177 @@ private val muscleGroupMap = mapOf(
 )
 
 fun translateMuscleGroup(group: String): String {
-    // Intenta traducir cada segmento separado por comas
     return group.split(",").joinToString(", ") { segment ->
         val trimmed = segment.trim()
         muscleGroupMap[trimmed.lowercase()] ?: trimmed.replaceFirstChar { it.uppercase() }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Dialog: Crear ejercicio personalizado
+// ═══════════════════════════════════════════════════════════════════════════════
+@Composable
+fun CreateExerciseDialog(
+    onDismiss: () -> Unit,
+    onSave: (CustomExercise) -> Unit
+) {
+    var name      by remember { mutableStateOf("") }
+    var mainGroup by remember { mutableStateOf("") }
+    var muscles   by remember { mutableStateOf("") }
+    var equipment by remember { mutableStateOf("") }
+    var notes     by remember { mutableStateOf("") }
+    var groupDropdown by remember { mutableStateOf(false) }
+
+    val muscleGroupOptions = listOf(
+        "Pecho", "Espalda", "Hombros", "Bíceps", "Tríceps",
+        "Abdominales", "Cuádriceps", "Isquiotibiales", "Glúteos", "Gemelos",
+        "Cardio", "Cuerpo Completo"
+    )
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        androidx.compose.material3.Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = Color(0xFF0D1A1A)
+        ) {
+            androidx.compose.foundation.lazy.LazyColumn(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🎨", fontSize = 22.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            stringResource(R.string.custom_ex_title),
+                            color = AccentWhite,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 20.sp
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                }
+
+                item {
+                    // Nombre
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text(stringResource(R.string.custom_ex_name)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = customExFieldColors()
+                    )
+                }
+
+                item {
+                    // Grupo muscular (dropdown)
+                    Box {
+                        OutlinedTextField(
+                            value = mainGroup,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.custom_ex_group)) },
+                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = TextSecondary) },
+                            modifier = Modifier.fillMaxWidth().clickable { groupDropdown = true },
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = customExFieldColors()
+                        )
+                        DropdownMenu(
+                            expanded = groupDropdown,
+                            onDismissRequest = { groupDropdown = false }
+                        ) {
+                            muscleGroupOptions.forEach { opt ->
+                                DropdownMenuItem(
+                                    text = { Text(opt) },
+                                    onClick = { mainGroup = opt; groupDropdown = false }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    // Músculos secundarios
+                    OutlinedTextField(
+                        value = muscles,
+                        onValueChange = { muscles = it },
+                        label = { Text(stringResource(R.string.custom_ex_muscles)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = customExFieldColors()
+                    )
+                }
+
+                item {
+                    // Equipamiento
+                    OutlinedTextField(
+                        value = equipment,
+                        onValueChange = { equipment = it },
+                        label = { Text(stringResource(R.string.custom_ex_equipment)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = customExFieldColors()
+                    )
+                }
+
+                item {
+                    // Notas
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text(stringResource(R.string.custom_ex_notes)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = customExFieldColors()
+                    )
+                }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                        ) { Text(stringResource(R.string.schedule_cancel), color = TextSecondary) }
+
+                        Button(
+                            onClick = {
+                                if (name.isNotBlank()) {
+                                    onSave(CustomExercise(
+                                        name      = name.trim(),
+                                        mainGroup = mainGroup,
+                                        musclesUsed = muscles,
+                                        equipment = equipment,
+                                        notes     = notes
+                                    ))
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = name.isNotBlank(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = Color.Black)
+                        ) { Text(stringResource(R.string.schedule_save), fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun customExFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = AccentCyan,
+    unfocusedBorderColor = Color(0xFF1A2A2A),
+    focusedTextColor = TextPrimary,
+    unfocusedTextColor = TextPrimary,
+    focusedLabelColor = AccentCyan,
+    unfocusedLabelColor = TextSecondary,
+    cursorColor = AccentCyan
+)

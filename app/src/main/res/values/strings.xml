@@ -6,7 +6,6 @@
         <item name="android:statusBarColor">@android:color/black</item>
         <item name="android:navigationBarColor">@android:color/black</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
     <!-- ═══ Strings ES (idioma por defecto) ═══ -->
@@ -36,6 +35,7 @@
     <string name="routines_active">⚡ ACTIVO</string>
     <string name="routines_duration">DURACIÓN</string>
     <string name="routines_my_routines">MIS RUTINAS</string>
+    <string name="routines_templates">Plantillas</string>
     <string name="routines_exercises_count">%d ejercicios</string>
     <string name="routines_empty_title">Crea tu primera rutina</string>
     <string name="routines_empty_subtitle">Pulsa + para empezar</string>
@@ -53,6 +53,8 @@
     <string name="workout_kg">KG</string>
     <string name="workout_reps">REPS</string>
     <string name="workout_time">TIEMPO</string>
+    <string name="workout_new_pr">NUEVO RÉCORD PERSONAL</string>
+    <string name="workout_total_kg">%d kg</string>
 
     <!-- Rest timer -->
     <string name="rest_title">Descanso</string>
@@ -111,20 +113,192 @@
     <string name="routine_exercises">EJERCICIOS</string>
     <string name="routine_save">GUARDAR</string>
     <string name="routine_reorder_hint">Mantén pulsado ↕ para reordenar</string>
+    <string name="routine_add_more">AÑADIR</string>
+
+    <!-- Routine detail -->
+    <string name="start_workout">INICIAR ENTRENAMIENTO</string>
+    <string name="continue_workout">CONTINUAR ENTRENAMIENTO</string>
 
     <!-- Profile -->
     <string name="profile_title">Mi Perfil</string>
     <string name="profile_workouts">Entrenos</string>
     <string name="profile_minutes">Minutos</string>
     <string name="profile_total_sets">Series</string>
-    <string name="profile_history">Historial</string>
+    <string name="profile_history">HISTORIAL</string>
+    <string name="profile_history_count">%d entrenamientos</string>
+    <string name="profile_no_workouts">Sin entrenamientos aún</string>
+    <string name="profile_start_first">¡Empieza tu primera rutina!</string>
     <string name="profile_no_history">Aún no has entrenado</string>
     <string name="profile_logout">Cerrar sesión</string>
+    <string name="profile_progress">PROGRESO</string>
 
-    <!-- Routine detail -->
-    <string name="start_workout">INICIAR ENTRENAMIENTO</string>
-    <string name="continue_workout">CONTINUAR ENTRENAMIENTO</string>
+    <!-- Settings -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_language">IDIOMA</string>
+    <string name="settings_close">Cerrar</string>
+
+    <!-- Templates -->
+    <string name="templates_title">Plantillas</string>
+    <string name="templates_subtitle">Elige una plantilla para crear una rutina preconfigurada</string>
+
+    <!-- Chart -->
+    <string name="chart_weeks_tab">Semanas</string>
+    <string name="chart_volume_tab">Volumen</string>
+    <string name="chart_no_data">Sin datos aún</string>
+    <string name="chart_tap_hint">Tap en una barra para ver el total</string>
+    <string name="chart_volume_hint">Volumen = peso × repeticiones (kg total)</string>
+
+    <!-- Calendar -->
+    <string name="cal_title">Calendario</string>
+    <string name="cal_subtitle">Planifica tus entrenamientos</string>
+    <string name="cal_routines_day">Rutinas · %s</string>
+    <string name="cal_no_routines">Sin rutinas para este día</string>
+    <string name="cal_add_hint">Pulsa + para programar una</string>
+    <string name="cal_fab_desc">Programar rutina</string>
+
+    <!-- Month names -->
+    <string name="month_jan">Enero</string>
+    <string name="month_feb">Febrero</string>
+    <string name="month_mar">Marzo</string>
+    <string name="month_apr">Abril</string>
+    <string name="month_may">Mayo</string>
+    <string name="month_jun">Junio</string>
+    <string name="month_jul">Julio</string>
+    <string name="month_aug">Agosto</string>
+    <string name="month_sep">Septiembre</string>
+    <string name="month_oct">Octubre</string>
+    <string name="month_nov">Noviembre</string>
+    <string name="month_dec">Diciembre</string>
+
+    <!-- Weekday headers (1 letter) -->
+    <string name="weekday_header_mon">L</string>
+    <string name="weekday_header_tue">M</string>
+    <string name="weekday_header_wed">X</string>
+    <string name="weekday_header_thu">J</string>
+    <string name="weekday_header_fri">V</string>
+    <string name="weekday_header_sat">S</string>
+    <string name="weekday_header_sun">D</string>
+
+    <!-- Weekday selectors (1 letter) -->
+    <string name="weekday_sel_mon">L</string>
+    <string name="weekday_sel_tue">M</string>
+    <string name="weekday_sel_wed">X</string>
+    <string name="weekday_sel_thu">J</string>
+    <string name="weekday_sel_fri">V</string>
+    <string name="weekday_sel_sat">S</string>
+    <string name="weekday_sel_sun">D</string>
+
+    <!-- Weekday full names -->
+    <string name="weekday_monday">lunes</string>
+    <string name="weekday_tuesday">martes</string>
+    <string name="weekday_wednesday">miércoles</string>
+    <string name="weekday_thursday">jueves</string>
+    <string name="weekday_friday">viernes</string>
+    <string name="weekday_saturday">sábado</string>
+    <string name="weekday_sunday">domingo</string>
+
+    <!-- Schedule dialog -->
+    <string name="schedule_title">Programar rutina</string>
+    <string name="schedule_routine_label">Rutina</string>
+    <string name="schedule_no_routines">Sin rutinas creadas</string>
+    <string name="schedule_start_date">Fecha de inicio</string>
+    <string name="schedule_hour">Hora de la notificación</string>
+    <string name="schedule_recurrence">Repetición</string>
+    <string name="schedule_once">Una vez</string>
+    <string name="schedule_every_n">Cada X días</string>
+    <string name="schedule_weekly">Semanal</string>
+    <string name="schedule_every_n_days">Cada cuántos días</string>
+    <string name="schedule_weekday">Día de la semana</string>
+    <string name="schedule_cancel">Cancelar</string>
+    <string name="schedule_save">Guardar</string>
+    <string name="schedule_duration">Durante</string>
+    <string name="schedule_months">%d meses</string>
+    <string name="schedule_rec_once">Una vez</string>
+    <string name="schedule_rec_every_n">Cada %d días</string>
+    <string name="schedule_rec_weekly">Cada %s</string>
+
+    <!-- Templates in HomeScreen -->
+    <string name="template_hypertrophy">Hipertrofia</string>
+    <string name="template_hypertrophy_desc">4×10 — Pecho, Espalda, Pierna, Hombros, Brazo</string>
+    <string name="template_strength">Fuerza</string>
+    <string name="template_strength_desc">5×5  — Sentadilla, Banca, Peso Muerto, Press</string>
+    <string name="template_definition">Definición</string>
+    <string name="template_definition_desc">Cardio + HIIT — Circuito funcional de cuerpo completo</string>
 
     <!-- Misc -->
     <string name="copy_suffix">(copia)</string>
+
+    <!-- Advanced sets -->
+    <string name="set_type_normal">Normal</string>
+    <string name="set_type_warmup">Calentamiento</string>
+    <string name="set_type_dropset">Drop Set</string>
+    <string name="set_type_failure">Fallo</string>
+    <string name="set_picker_title">Tipo de serie</string>
+
+    <!-- 1RM Calculator -->
+    <string name="orm_title">Calculadora 1RM</string>
+    <string name="orm_weight">Peso</string>
+    <string name="orm_reps">Repeticiones</string>
+    <string name="orm_estimated">1RM ESTIMADO</string>
+    <string name="orm_vs_best">vs tu mejor:</string>
+    <string name="orm_percentage_table">TABLA DE PORCENTAJES</string>
+    <string name="orm_open">Ver 1RM</string>
+
+    <!-- Body measurements -->
+    <string name="body_title">Medidas corporales</string>
+    <string name="body_current">MEDIDAS ACTUALES</string>
+    <string name="body_weight">Peso</string>
+    <string name="body_fat">% Grasa</string>
+    <string name="body_chest">Pecho</string>
+    <string name="body_waist">Cintura</string>
+    <string name="body_hips">Cadera</string>
+    <string name="body_bicep">Bícep</string>
+    <string name="body_thigh">Muslo</string>
+    <string name="body_circumferences">CIRCUNFERENCIAS (cm)</string>
+    <string name="body_add_title">Añadir medida</string>
+    <string name="body_history">HISTORIAL DE MEDIDAS</string>
+    <string name="body_empty_title">Sin medidas aún</string>
+    <string name="body_empty_hint">Pulsa + para empezar a registrar tu progreso</string>
+    <string name="body_weight_chart">EVOLUCIÓN DEL PESO</string>
+    <string name="body_menu_item">Medidas corporales</string>
+
+    <!-- Achievements &amp; Streak -->
+    <string name="achievements_title">LOGROS</string>
+    <string name="streak_title">RACHA ACTUAL</string>
+    <string name="streak_days">%d días</string>
+    <string name="streak_zero">Empieza hoy</string>
+    <string name="achievement_locked">Bloqueado</string>
+    <string name="achievement_new">Nuevo logro</string>
+
+    <!-- Muscle map -->
+    <string name="muscle_map_title">MAPA MUSCULAR</string>
+    <string name="muscle_map_subtitle">Últimos 7 días</string>
+    <string name="muscle_none">Sin actividad</string>
+    <string name="muscle_light">Moderado</string>
+    <string name="muscle_high">Intenso</string>
+
+    <!-- Custom exercises -->
+    <string name="custom_ex_title">Ejercicio personalizado</string>
+    <string name="custom_ex_name">Nombre del ejercicio</string>
+    <string name="custom_ex_group">Grupo muscular</string>
+    <string name="custom_ex_muscles">Músculos secundarios</string>
+    <string name="custom_ex_equipment">Equipamiento</string>
+    <string name="custom_ex_notes">Notas (opcional)</string>
+    <string name="custom_ex_badge">Personalizado</string>
+    <string name="custom_ex_my_list">MIS EJERCICIOS</string>
+
+    <!-- PR Board -->
+    <string name="pr_board_title">Récords Personales</string>
+    <string name="pr_empty_title">Sin récords todavía</string>
+    <string name="pr_empty_hint">Completa entrenamientos para ver tu progreso</string>
+
+    <!-- Compartir workout -->
+    <string name="share_button">Compartir</string>
+    <string name="share_title">Compartir entrenamiento</string>
+
+    <!-- Gráfica por ejercicio -->
+    <string name="exercise_progress_subtitle">Progreso histórico</string>
+    <string name="exercise_no_data">Sin datos para este ejercicio</string>
+    <string name="exercise_need_more">Necesitas al menos 2 sesiones</string>
+
 </resources>
