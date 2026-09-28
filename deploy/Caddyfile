@@ -1,4 +1,9 @@
-# Caddy pide y renueva solo el certificado HTTPS para tu dominio.
+# Caddy pide y renueva solo el certificado HTTPS para tu dominio (por el puerto 80).
+# HTTPS_PORT: 443 por defecto; otro si 443 no está abierto (p. ej. 9001).
+{
+	https_port {$HTTPS_PORT:443}
+}
+
 {$DOMAIN} {
 	encode gzip
 	request_body {

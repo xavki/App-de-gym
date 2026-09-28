@@ -39,9 +39,10 @@ services:
       - server
     ports:
       - "80:80"
-      - "443:443"
+      - "${HTTPS_PORT:-443}:${HTTPS_PORT:-443}"
     environment:
       DOMAIN: ${DOMAIN:?Pon DOMAIN en .env}
+      HTTPS_PORT: ${HTTPS_PORT:-443}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
