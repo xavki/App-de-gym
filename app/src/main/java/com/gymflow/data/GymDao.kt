@@ -119,21 +119,24 @@ interface GymDao {
     @Query("SELECT * FROM schedules WHERE id = :id")
     suspend fun schedule(id: String): ScheduleEntity?
 
+    @Query("SELECT * FROM schedules WHERE userId = :uid AND deletedAt IS NOT NULL")
+    suspend fun deletedSchedules(uid: String): List<ScheduleEntity>
+
     @Upsert suspend fun upsertAchievements(items: List<AchievementEntity>)
 
     @Query("SELECT * FROM achievements WHERE userId = :uid AND deletedAt IS NULL")
     suspend fun achievements(uid: String): List<AchievementEntity>
 
-    // ─── Borrado lógico ──────────────────────────────────────────────────────
-    @Query("UPDATE routines SET deletedAt = :now, updatedAt = :now WHERE id = :id")
+    // ─── Borrado lógico (queda pendiente de subir: dirty = 1) ────────────────
+    @Query("UPDATE routines SET deletedAt = :now, updatedAt = :now, dirty = 1 WHERE id = :id")
     suspend fun softDeleteRoutine(id: String, now: Long)
 
-    @Query("UPDATE exercises SET deletedAt = :now, updatedAt = :now WHERE id = :id")
+    @Query("UPDATE exercises SET deletedAt = :now, updatedAt = :now, dirty = 1 WHERE id = :id")
     suspend fun softDeleteExercise(id: String, now: Long)
 
-    @Query("UPDATE body_measurements SET deletedAt = :now, updatedAt = :now WHERE id = :id")
+    @Query("UPDATE body_measurements SET deletedAt = :now, updatedAt = :now, dirty = 1 WHERE id = :id")
     suspend fun softDeleteMeasurement(id: String, now: Long)
 
-    @Query("UPDATE schedules SET deletedAt = :now, updatedAt = :now WHERE id = :id")
+    @Query("UPDATE schedules SET deletedAt = :now, updatedAt = :now, dirty = 1 WHERE id = :id")
     suspend fun softDeleteSchedule(id: String, now: Long)
 }

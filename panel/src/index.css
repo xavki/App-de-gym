@@ -250,3 +250,17 @@ tr.muted td { color: var(--text-muted); }
 .wx { margin-top: 12px; }
 .wx-head { margin-bottom: 4px; }
 table.sets { max-width: 480px; }
+
+/* ─── Vinculación con el servidor ─────────────────────────────────────────── */
+.pair {
+  width: 100%; display: grid; gap: 6px; justify-items: center; text-align: center;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px; padding: 20px 16px;
+}
+.pair-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
+.code-input {
+  font: 600 20px/1 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: 0.12em; text-align: center;
+  width: 14ch; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text-primary); text-transform: uppercase;
+}
+.code-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.btn:disabled { opacity: 0.5; cursor: default; }

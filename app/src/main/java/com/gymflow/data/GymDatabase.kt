@@ -12,17 +12,19 @@ import androidx.room.RoomDatabase
         WorkoutEntity::class, WorkoutExerciseEntity::class, WorkoutSetEntity::class,
         BodyMeasurementEntity::class, ScheduleEntity::class, AchievementEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class GymDatabase : RoomDatabase() {
     abstract fun dao(): GymDao
+    abstract fun syncDao(): SyncDao
 
     companion object {
         @Volatile private var instance: GymDatabase? = null
 
         fun get(context: Context): GymDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, GymDatabase::class.java, "gymflow.db")
+                .addMigrations(*Migrations.ALL)
                 .build()
                 .also { instance = it }
         }

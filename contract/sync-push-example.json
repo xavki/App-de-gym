@@ -1,0 +1,147 @@
+{
+  "changes": [
+    {
+      "table": "exercises",
+      "id": "87766a20-93bc-403b-a7d3-b5b66d3ab9e1",
+      "updatedAt": 1790610616000,
+      "deletedAt": null,
+      "data": {
+        "id": "87766a20-93bc-403b-a7d3-b5b66d3ab9e1",
+        "userId": "user-1",
+        "name": "Bench Press",
+        "nameEs": "Bench Press",
+        "mainGroup": "Pecho",
+        "musclesUsed": "",
+        "equipment": "",
+        "instructions": "",
+        "instructionsEs": null,
+        "subCategory": null,
+        "difficulty": null,
+        "imageUrl": null,
+        "gifUrl": null,
+        "notes": "",
+        "isCustom": true,
+        "createdAt": 1790610616000,
+        "updatedAt": 1790610616000,
+        "deletedAt": null
+      }
+    },
+    {
+      "table": "workouts",
+      "id": "59eb4793-1c2b-4401-8949-6e1c15497a2a",
+      "updatedAt": 1790610616000,
+      "deletedAt": null,
+      "data": {
+        "id": "59eb4793-1c2b-4401-8949-6e1c15497a2a",
+        "userId": "user-1",
+        "routineId": null,
+        "name": "Push, heavy",
+        "startedAt": 1790610616000,
+        "durationSeconds": 0,
+        "bodyweightKg": null,
+        "notes": "",
+        "createdAt": 1790610616000,
+        "updatedAt": 1790610616000,
+        "deletedAt": null
+      }
+    },
+    {
+      "table": "workout_exercises",
+      "id": "3b144428-4e5c-3d98-8a1a-f4e155d69710",
+      "updatedAt": 1790610616000,
+      "deletedAt": null,
+      "data": {
+        "id": "3b144428-4e5c-3d98-8a1a-f4e155d69710",
+        "workoutId": "59eb4793-1c2b-4401-8949-6e1c15497a2a",
+        "exerciseId": "87766a20-93bc-403b-a7d3-b5b66d3ab9e1",
+        "exerciseName": "Bench Press",
+        "mainGroup": "Pecho",
+        "position": 0,
+        "notes": "",
+        "supersetGroup": null,
+        "createdAt": 1790610616000,
+        "updatedAt": 1790610616000,
+        "deletedAt": null
+      }
+    },
+    {
+      "table": "workout_exercises",
+      "id": "d0ef8fe2-98ca-34f9-b8b5-21649f93412b",
+      "updatedAt": 1790610616000,
+      "deletedAt": null,
+      "data": {
+        "id": "d0ef8fe2-98ca-34f9-b8b5-21649f93412b",
+        "workoutId": "59eb4793-1c2b-4401-8949-6e1c15497a2a",
+        "exerciseId": null,
+        "exerciseName": "Overhead Press",
+        "mainGroup": null,
+        "position": 1,
+        "notes": "",
+        "supersetGroup": null,
+        "createdAt": 1790610616000,
+        "updatedAt": 1790610616000,
+        "deletedAt": null
+      }
+    },
+    {
+      "table": "workout_sets",
+      "id": "1bd3cc74-39a6-34f9-8299-63b7299669fa",
+      "updatedAt": 1790610616000,
+      "deletedAt": null,
+      "data": {
+        "id": "1bd3cc74-39a6-34f9-8299-63b7299669fa",
+        "workoutExerciseId": "3b144428-4e5c-3d98-8a1a-f4e155d69710",
+        "position": 0,
+        "setType": "NORMAL",
+        "weightKg": 60.0,
+        "reps": 10,
+        "timeSeconds": 0,
+        "rpe": 9.0,
+        "completed": true,
+        "createdAt": 1790610616000,
+        "updatedAt": 1790610616000,
+        "deletedAt": null
+      }
+    },
+    {
+      "table": "workout_sets",
+      "id": "72bd11e9-0a8b-3e0a-b2fd-7fd176601e6c",
+      "updatedAt": 1790610616000,
+      "deletedAt": null,
+      "data": {
+        "id": "72bd11e9-0a8b-3e0a-b2fd-7fd176601e6c",
+        "workoutExerciseId": "3b144428-4e5c-3d98-8a1a-f4e155d69710",
+        "position": 1,
+        "setType": "NORMAL",
+        "weightKg": 70.0,
+        "reps": 8,
+        "timeSeconds": 0,
+        "rpe": null,
+        "completed": true,
+        "createdAt": 1790610616000,
+        "updatedAt": 1790610616000,
+        "deletedAt": null
+      }
+    },
+    {
+      "table": "workout_sets",
+      "id": "14da944b-aefc-3915-84a2-4350bd577b3b",
+      "updatedAt": 1790610616000,
+      "deletedAt": null,
+      "data": {
+        "id": "14da944b-aefc-3915-84a2-4350bd577b3b",
+        "workoutExerciseId": "d0ef8fe2-98ca-34f9-b8b5-21649f93412b",
+        "position": 0,
+        "setType": "NORMAL",
+        "weightKg": 40.0,
+        "reps": 10,
+        "timeSeconds": 0,
+        "rpe": null,
+        "completed": false,
+        "createdAt": 1790610616000,
+        "updatedAt": 1790610616000,
+        "deletedAt": null
+      }
+    }
+  ]
+}

@@ -665,7 +665,11 @@ fun ProfileScreen(
             }
         }
 
-        // ── Exportar datos ──────────────────────────────────────────────────
+        // ── Sincronización y exportación ────────────────────────────────────
+        item {
+            Spacer(Modifier.height(24.dp))
+            SyncSection(viewModel)
+        }
         item {
             Spacer(Modifier.height(24.dp))
             ExportDataSection(viewModel)

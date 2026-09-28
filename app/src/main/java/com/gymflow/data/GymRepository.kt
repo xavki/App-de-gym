@@ -41,7 +41,7 @@ class GymRepository(private val db: GymDatabase) {
                 equipment = d.equipment, instructions = d.instructions, instructionsEs = d.instructionsEs,
                 subCategory = d.subCategory, difficulty = d.difficulty,
                 imageUrl = d.imageUrl, gifUrl = d.gifUrl, notes = "", isCustom = false,
-                createdAt = t, updatedAt = t
+                createdAt = t, updatedAt = t, dirty = false   // el catálogo global no se sube
             )
         })
     }
@@ -51,22 +51,27 @@ class GymRepository(private val db: GymDatabase) {
             CustomExercise(it.id, uid, it.name, it.mainGroup, it.musclesUsed, it.equipment ?: "", it.notes)
         }
 
-    suspend fun saveCustomExercise(uid: String, c: CustomExercise) {
-        val t = now()
+    /** [at]: fecha de modificación; la importación desde Firestore pasa una antigua (ver IMPORTED_AT). */
+    suspend fun saveCustomExercise(uid: String, c: CustomExercise, at: Long = now()) {
         val existing = dao.exercise(c.id)
         dao.upsertExercises(listOf(ExerciseEntity(
             id = c.id, userId = uid, name = c.name, nameEs = c.name, mainGroup = c.mainGroup,
             musclesUsed = c.musclesUsed, equipment = c.equipment, instructions = "", instructionsEs = null,
             subCategory = null, difficulty = null, imageUrl = null, gifUrl = null, notes = c.notes,
-            isCustom = true, createdAt = existing?.createdAt ?: t, updatedAt = t
+            isCustom = true, createdAt = existing?.createdAt ?: at, updatedAt = at
         )))
     }
 
     suspend fun deleteCustomExercise(id: String) = dao.softDeleteExercise(id, now())
 
-    /** nombre → id del catálogo (global + personalizados) para rellenar exerciseId. */
-    private suspend fun exerciseIdsByName(uid: String): Map<String, String> =
-        dao.allExercisesFor(uid).associate { it.name to it.id }
+    /** Resuelve id y grupo muscular de un ejercicio por su id o, si no, por nombre (global + personalizados). */
+    private class Catalog(entities: List<ExerciseEntity>) {
+        private val byId = entities.associateBy { it.id }
+        private val byName = entities.associateBy { it.name }
+        fun find(exerciseId: String, name: String): ExerciseEntity? = byId[exerciseId] ?: byName[name]
+    }
+
+    private suspend fun catalog(uid: String) = Catalog(dao.allExercisesFor(uid))
 
     // ══════════════════════════════════════════════════════════════════════════
     // RUTINAS
@@ -94,18 +99,20 @@ class GymRepository(private val db: GymDatabase) {
     }
 
     /**
-     * Guarda la rutina completa. Solo cambia updatedAt de lo que realmente cambió y
-     * marca como borrado (lógico) lo que ya no está, para que el sync sea incremental.
+     * Guarda la rutina completa. Solo cambia updatedAt (y marca dirty) de lo que
+     * realmente cambió y marca como borrado (lógico) lo que ya no está, para que la
+     * sincronización sea incremental. [at]: fecha de modificación (ahora, salvo al importar).
      */
-    suspend fun saveRoutine(uid: String, routine: WorkoutSession) = db.withTransaction {
-        val t = now()
-        val ids = exerciseIdsByName(uid)
+    suspend fun saveRoutine(uid: String, routine: WorkoutSession, at: Long = now()) = db.withTransaction {
+        val t = at
+        val cat = catalog(uid)
 
+        // Al comparar, dirty se copia de la fila vieja: solo cuenta el contenido
         val oldRoutine = dao.routine(routine.id)
-        val newRoutine = RoutineEntity(routine.id, uid, routine.name, oldRoutine?.createdAt ?: t, t)
-        if (oldRoutine == null || oldRoutine.deletedAt != null ||
-            oldRoutine.copy(updatedAt = t) != newRoutine) {
-            dao.upsertRoutines(listOf(newRoutine))
+        val newRoutine = RoutineEntity(routine.id, uid, routine.name, oldRoutine?.createdAt ?: t,
+            oldRoutine?.updatedAt ?: t, dirty = oldRoutine?.dirty ?: true)
+        if (oldRoutine == null || oldRoutine.deletedAt != null || oldRoutine != newRoutine) {
+            dao.upsertRoutines(listOf(newRoutine.copy(updatedAt = t, dirty = true)))
         }
 
         val oldEx = dao.routineExercisesOf(routine.id).associateBy { it.id }
@@ -121,14 +128,16 @@ class GymRepository(private val db: GymDatabase) {
                 ?: UUID.randomUUID().toString()
             keptEx += exId
             val old = oldEx[exId]
+            val known = cat.find(ex.exerciseId, ex.exerciseName)
             val e = RoutineExerciseEntity(
                 id = exId, routineId = routine.id,
-                exerciseId = ex.exerciseId.ifBlank { null } ?: ids[ex.exerciseName],
-                exerciseName = ex.exerciseName, position = i, notes = ex.notes ?: "",
+                exerciseId = ex.exerciseId.ifBlank { null } ?: known?.id,
+                exerciseName = ex.exerciseName, mainGroup = known?.mainGroup ?: old?.mainGroup,
+                position = i, notes = ex.notes ?: "",
                 supersetGroup = old?.supersetGroup,
-                createdAt = old?.createdAt ?: t, updatedAt = old?.updatedAt ?: t
+                createdAt = old?.createdAt ?: t, updatedAt = old?.updatedAt ?: t, dirty = old?.dirty ?: true
             )
-            if (old == null || old != e) exOut += e.copy(updatedAt = t)
+            if (old == null || old != e) exOut += e.copy(updatedAt = t, dirty = true)
 
             ex.sets.forEachIndexed { j, s ->
                 val setId = s.id.takeIf { it !in keptSets && (it in oldSets || dao.routineSetOwner(it) == null) }
@@ -138,15 +147,15 @@ class GymRepository(private val db: GymDatabase) {
                 val se = RoutineSetEntity(
                     id = setId, routineExerciseId = exId, position = j, setType = s.setType,
                     targetWeightKg = s.weight, targetReps = s.repetitions, targetTimeSeconds = s.timeSeconds,
-                    createdAt = oldS?.createdAt ?: t, updatedAt = oldS?.updatedAt ?: t
+                    createdAt = oldS?.createdAt ?: t, updatedAt = oldS?.updatedAt ?: t, dirty = oldS?.dirty ?: true
                 )
-                if (oldS == null || oldS != se) setOut += se.copy(updatedAt = t)
+                if (oldS == null || oldS != se) setOut += se.copy(updatedAt = t, dirty = true)
             }
         }
         oldEx.values.filter { it.id !in keptEx && it.deletedAt == null }
-            .forEach { exOut += it.copy(deletedAt = t, updatedAt = t) }
+            .forEach { exOut += it.copy(deletedAt = t, updatedAt = t, dirty = true) }
         oldSets.values.filter { it.id !in keptSets && it.deletedAt == null }
-            .forEach { setOut += it.copy(deletedAt = t, updatedAt = t) }
+            .forEach { setOut += it.copy(deletedAt = t, updatedAt = t, dirty = true) }
 
         dao.upsertRoutineExercises(exOut)
         dao.upsertRoutineSets(setOut)
@@ -194,7 +203,7 @@ class GymRepository(private val db: GymDatabase) {
         onlyLoggedSets: Boolean = true,
         createdAt: Long = now()
     ) = db.withTransaction {
-        val ids = exerciseIdsByName(uid)
+        val cat = catalog(uid)
         val bw = bodyweightKg ?: dao.latestBodyweight(uid)
         dao.upsertWorkouts(listOf(WorkoutEntity(
             id = workoutId, userId = uid, routineId = routineId, name = session.name,
@@ -207,10 +216,12 @@ class GymRepository(private val db: GymDatabase) {
             val sets = if (onlyLoggedSets) ex.sets.filter { it.isLogged() } else ex.sets
             if (sets.isEmpty()) return@forEachIndexed
             val exId = stableUuid("$workoutId:ex:$i")
+            val known = cat.find(ex.exerciseId, ex.exerciseName)
             exOut += WorkoutExerciseEntity(
                 id = exId, workoutId = workoutId,
-                exerciseId = ex.exerciseId.ifBlank { null } ?: ids[ex.exerciseName],
-                exerciseName = ex.exerciseName, position = exOut.size, notes = ex.notes ?: "",
+                exerciseId = ex.exerciseId.ifBlank { null } ?: known?.id,
+                exerciseName = ex.exerciseName, mainGroup = known?.mainGroup,
+                position = exOut.size, notes = ex.notes ?: "",
                 createdAt = createdAt, updatedAt = createdAt
             )
             sets.forEachIndexed { j, s ->
@@ -242,8 +253,8 @@ class GymRepository(private val db: GymDatabase) {
             it.chestCm, it.waistCm, it.hipsCm, it.bicepCm, it.thighCm)
     }
 
-    suspend fun saveMeasurement(uid: String, m: BodyMeasurement) {
-        val t = now()
+    suspend fun saveMeasurement(uid: String, m: BodyMeasurement, at: Long = now()) {
+        val t = at
         val existing = dao.measurement(m.id)
         dao.upsertMeasurements(listOf(BodyMeasurementEntity(
             id = m.id, userId = uid, measuredAt = m.date.time, weightKg = m.weight, bodyFatPct = m.bodyFat,
@@ -263,8 +274,8 @@ class GymRepository(private val db: GymDatabase) {
             it.recurrenceType, it.intervalDays, it.weekDay, it.endDate, uid)
     }
 
-    suspend fun saveSchedule(uid: String, s: ScheduledRoutine) {
-        val t = now()
+    suspend fun saveSchedule(uid: String, s: ScheduledRoutine, at: Long = now()) {
+        val t = at
         val existing = dao.schedule(s.id)
         dao.upsertSchedules(listOf(ScheduleEntity(
             id = s.id, userId = uid, routineId = s.routineId, routineName = s.routineName,
@@ -275,6 +286,12 @@ class GymRepository(private val db: GymDatabase) {
     }
 
     suspend fun deleteSchedule(id: String) = dao.softDeleteSchedule(id, now())
+
+    /** Programaciones borradas (p. ej. desde otro móvil), para cancelar sus alarmas. */
+    suspend fun deletedSchedules(uid: String): List<ScheduledRoutine> = dao.deletedSchedules(uid).map {
+        ScheduledRoutine(it.id, it.routineId, it.routineName, it.startDate, it.hourOfDay, it.minute,
+            it.recurrenceType, it.intervalDays, it.weekDay, it.endDate, uid)
+    }
 
     // ══════════════════════════════════════════════════════════════════════════
     // LOGROS
@@ -290,6 +307,26 @@ class GymRepository(private val db: GymDatabase) {
             id = stableUuid("$uid:achievement:$key"), userId = uid, achievementKey = key,
             unlockedAt = at, createdAt = at, updatedAt = at
         )))
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // IMPORTACIÓN: ¿existe ya? (vivo o borrado) — nunca se pisa lo que haya
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private val syncDao = db.syncDao()
+    suspend fun hasRoutine(id: String) = syncDao.findRoutine(id) != null
+    suspend fun hasWorkout(id: String) = syncDao.findWorkout(id) != null
+    suspend fun hasMeasurement(id: String) = syncDao.findMeasurement(id) != null
+    suspend fun hasExercise(id: String) = syncDao.findExercise(id) != null
+    suspend fun hasSchedule(id: String) = syncDao.findSchedule(id) != null
+    suspend fun hasAchievement(uid: String, key: String) = syncDao.findAchievement(stableUuid("$uid:achievement:$key")) != null
+
+    /** Número de filas con cambios sin subir (para la pantalla de sincronización). */
+    suspend fun pendingChanges(uid: String): Int = with(syncDao) {
+        pendingExercises(uid).size + pendingRoutines(uid).size + pendingRoutineExercises(uid).size +
+            pendingRoutineSets(uid).size + pendingWorkouts(uid).size + pendingWorkoutExercises(uid).size +
+            pendingWorkoutSets(uid).size + pendingMeasurements(uid).size + pendingSchedules(uid).size +
+            pendingAchievements(uid).size
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -339,6 +376,12 @@ class GymRepository(private val db: GymDatabase) {
         fun stableUuid(raw: String): String =
             runCatching { UUID.fromString(raw).toString() }.getOrNull()
                 ?: UUID.nameUUIDFromBytes(raw.toByteArray()).toString()
+
+        /**
+         * Fecha de modificación de lo importado desde Firestore: "muy antigua", para
+         * que cualquier edición real hecha en otro dispositivo gane al sincronizar.
+         */
+        const val IMPORTED_AT = 1L
     }
 }
 

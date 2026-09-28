@@ -1,0 +1,53 @@
+# GymFlow en tu VM: PostgreSQL + servidor + Caddy (HTTPS automático).
+# Uso (desde esta carpeta):  cp .env.example .env  →  edita .env  →  docker compose up -d --build
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gymflow
+      POSTGRES_USER: gymflow
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Pon DB_PASSWORD en .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gymflow -d gymflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/gymflow
+      DATABASE_USER: gymflow
+      DATABASE_PASSWORD: ${DB_PASSWORD}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?Pon FIREBASE_PROJECT_ID en .env}
+    # Sin puertos publicados: solo Caddy habla con él
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Pon DOMAIN en .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

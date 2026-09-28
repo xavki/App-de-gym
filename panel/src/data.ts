@@ -1,8 +1,8 @@
 import type { ExportSet, ExportWorkout, GymExport } from './types'
 
 // ─── Fuente de datos ──────────────────────────────────────────────────────────
-// Hoy: el JSON exportado desde la app. Cuando exista el backend, basta con añadir
-// aquí otra función que devuelva un GymExport desde la API.
+// El JSON exportado desde la app (archivo) o, si el panel lo sirve tu servidor,
+// la misma exportación pedida en vivo a la API (ver "Servidor propio" más abajo).
 
 export const SUPPORTED_SCHEMA = 1
 const STORAGE_KEY = 'gymflow-panel:last-export'
@@ -39,6 +39,56 @@ export function loadLocal(): string | null {
 }
 export function clearLocal() {
   try { localStorage.removeItem(STORAGE_KEY) } catch { /* nada */ }
+}
+
+// ─── Servidor propio ──────────────────────────────────────────────────────────
+// Si el panel lo sirve el servidor GymFlow, lee los datos en vivo. Se vincula una
+// vez con el código que muestra la app (Perfil → Vincular panel web); el servidor
+// devuelve un token de solo lectura que se recuerda en este navegador.
+
+const TOKEN_KEY = 'gymflow-panel:server-token'
+
+export class UnauthorizedError extends Error {}
+
+export function loadToken(): string | null {
+  try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
+}
+export function saveToken(token: string) {
+  try { localStorage.setItem(TOKEN_KEY, token) } catch { /* sin almacenamiento: habrá que vincular otra vez */ }
+}
+export function clearToken() {
+  try { localStorage.removeItem(TOKEN_KEY) } catch { /* nada */ }
+}
+
+/** ¿Este panel lo está sirviendo un servidor GymFlow? */
+export async function detectServer(): Promise<boolean> {
+  try {
+    const res = await fetch('/health', { headers: { Accept: 'application/json' } })
+    if (!res.ok) return false
+    const body = await res.json()
+    return body?.app === 'gymflow'
+  } catch {
+    return false
+  }
+}
+
+export async function claimCode(code: string): Promise<string> {
+  const res = await fetch('/api/pairing/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, label: navigator.userAgent.slice(0, 100) }),
+  })
+  if (res.status === 404) throw new Error('Código incorrecto o caducado. Pide uno nuevo en la app.')
+  if (res.status === 429) throw new Error('Demasiados intentos. Espera un minuto.')
+  if (!res.ok) throw new Error(`El servidor respondió ${res.status}`)
+  return (await res.json()).token as string
+}
+
+export async function fetchServerExport(token: string): Promise<GymExport> {
+  const res = await fetch('/api/export', { headers: { Authorization: `Bearer ${token}` } })
+  if (res.status === 401) throw new UnauthorizedError('El acceso de este panel se ha revocado. Vincúlalo de nuevo.')
+  if (!res.ok) throw new Error(`El servidor respondió ${res.status}`)
+  return parseExport(await res.text())
 }
 
 // ─── Datos de ejemplo ─────────────────────────────────────────────────────────

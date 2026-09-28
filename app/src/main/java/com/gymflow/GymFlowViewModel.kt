@@ -10,6 +10,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.gymflow.data.DataExporter
 import com.gymflow.data.FirestoreImporter
 import com.gymflow.data.GymRepository
+import com.gymflow.sync.SyncManager
+import com.gymflow.sync.SyncState
 import kotlinx.coroutines.*
 import java.util.Calendar
 import java.util.Date
@@ -72,6 +74,14 @@ class GymFlowViewModel(
     var autoRestTimer      by mutableStateOf(false)  // Auto-iniciar timer al completar serie
     var defaultRestSeconds by mutableIntStateOf(90)  // Duración del descanso automático
 
+    // ─── Sincronización (declarado antes de init: init ya lo usa) ───────────
+    var syncState by mutableStateOf<SyncState>(SyncState.Idle)
+        private set
+    var pendingChanges by mutableIntStateOf(0)
+        private set
+    var serverUrl by mutableStateOf(SyncManager.serverUrl(appContext))
+        private set
+
     init {
         auth.addAuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
@@ -82,7 +92,20 @@ class GymFlowViewModel(
                     loadAll()   // lo local aparece al instante
                     FirestoreImporter.importUserDataIfNeeded(appContext, repo, db, user.uid)
                     loadAll()
+                    SyncManager.schedule(appContext)
+                    refreshPending()
                 }
+            }
+        }
+        // Cuando llegan cambios del servidor (otro móvil), se recargan las listas
+        viewModelScope.launch {
+            SyncManager.state.collect { state ->
+                syncState = state
+                if (state is SyncState.Done && state.result.pulled > 0) {
+                    loadAll()
+                    if ("schedules" in state.result.pulledTables) rescheduleAlarms()
+                }
+                if (state !is SyncState.Running) refreshPending()
             }
         }
     }
@@ -94,6 +117,62 @@ class GymFlowViewModel(
         loadMeasurements()
         loadCustomExercises()
         loadAchievements()
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SINCRONIZACIÓN con el servidor propio
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** Tras cualquier cambio local: sincronizar en segundo plano en cuanto haya red. */
+    private fun changed() {
+        SyncManager.requestSync(appContext)
+        refreshPending()
+    }
+
+    private fun refreshPending() {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch { pendingChanges = repo.pendingChanges(uid) }
+    }
+
+    fun updateServerUrl(url: String) {
+        SyncManager.setServerUrl(appContext, url)
+        serverUrl = SyncManager.serverUrl(appContext)
+    }
+
+    fun syncNow() {
+        viewModelScope.launch {
+            try {
+                if (SyncManager.syncNow(appContext) == null) errorMessage = "Configura antes la dirección del servidor"
+            } catch (e: Exception) {
+                errorMessage = "No se pudo sincronizar: ${e.message}"
+            }
+        }
+    }
+
+    /** Código para vincular el panel web (caduca en 10 minutos). */
+    fun createPairingCode(onResult: (String?) -> Unit) {
+        val api = SyncManager.api(appContext) ?: return onResult(null)
+        viewModelScope.launch {
+            onResult(try { api.pairingCode().code } catch (e: Exception) { errorMessage = "No se pudo pedir el código: ${e.message}"; null })
+        }
+    }
+
+    fun revokePanels(onResult: (Int?) -> Unit) {
+        val api = SyncManager.api(appContext) ?: return onResult(null)
+        viewModelScope.launch {
+            onResult(try { api.revokePanels().revoked } catch (e: Exception) { errorMessage = "No se pudo desvincular: ${e.message}"; null })
+        }
+    }
+
+    /** Las programaciones que llegan de otro móvil necesitan su alarma en este. */
+    private fun rescheduleAlarms() {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            NotificationHelper.let { helper ->
+                repo.deletedSchedules(uid).forEach { helper.cancelAlarm(appContext, it) }
+                repo.schedules(uid).filter { helper.nextTriggerMs(it) != null }.forEach { helper.scheduleAlarm(appContext, it) }
+            }
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -164,6 +243,7 @@ class GymFlowViewModel(
             repo.saveWorkout(user.uid, routine, routineId = routine.id, startedAt = startedAt)
             // La rutina recuerda los últimos pesos usados
             repo.saveRoutine(user.uid, routine.copy(exercises = cleanedExercises))
+            changed()
             reloadRoutines(user.uid)
             reloadHistory(user.uid)
             checkAchievements(routine)
@@ -189,6 +269,7 @@ class GymFlowViewModel(
         viewModelScope.launch {
             try {
                 repo.saveSchedule(uid, s)
+                changed()
                 scheduledRoutines.removeAll { it.id == s.id }
                 scheduledRoutines.add(s)
                 NotificationHelper.scheduleAlarm(context, s)
@@ -203,6 +284,7 @@ class GymFlowViewModel(
         viewModelScope.launch {
             try {
                 repo.deleteSchedule(schedule.id)
+                changed()
                 scheduledRoutines.removeAll { it.id == schedule.id }
                 NotificationHelper.cancelAlarm(context, schedule)
             } catch (e: Exception) {
@@ -262,6 +344,7 @@ class GymFlowViewModel(
         viewModelScope.launch {
             try {
                 if (delete) repo.deleteRoutine(routine.id) else repo.saveRoutine(user.uid, routine)
+                changed()
                 reloadRoutines(user.uid)
             } catch (e: Exception) {
                 errorMessage = if (delete) "Error al borrar" else "Error al guardar"
@@ -351,6 +434,7 @@ class GymFlowViewModel(
         val m = measurement.copy(userId = uid)
         viewModelScope.launch {
             repo.saveMeasurement(uid, m)
+            changed()
             bodyMeasurements.removeAll { it.id == m.id }
             bodyMeasurements.add(m)
             bodyMeasurements.sortBy { it.date }
@@ -361,6 +445,7 @@ class GymFlowViewModel(
         auth.currentUser ?: return
         viewModelScope.launch {
             repo.deleteMeasurement(measurement.id)
+            changed()
             bodyMeasurements.removeAll { it.id == measurement.id }
         }
     }
@@ -383,6 +468,7 @@ class GymFlowViewModel(
         val ex = exercise.copy(userId = uid)
         viewModelScope.launch {
             repo.saveCustomExercise(uid, ex)
+            changed()
             customExercises.removeAll { it.id == ex.id }
             customExercises.add(ex)
             // Comprobar logro "Creador"
@@ -394,6 +480,7 @@ class GymFlowViewModel(
         auth.currentUser ?: return
         viewModelScope.launch {
             repo.deleteCustomExercise(exercise.id)
+            changed()
             customExercises.removeAll { it.id == exercise.id }
         }
     }
@@ -451,7 +538,7 @@ class GymFlowViewModel(
         val unlocked = achievements[idx].copy(unlockedAt = now)
         achievements[idx] = unlocked
         newAchievement = unlocked
-        viewModelScope.launch { repo.unlockAchievement(uid, id, now.time) }
+        viewModelScope.launch { repo.unlockAchievement(uid, id, now.time); changed() }
     }
 
     fun checkAchievements(lastWorkout: WorkoutSession? = null) {

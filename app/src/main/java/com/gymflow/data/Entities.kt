@@ -1,26 +1,33 @@
 package com.gymflow.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Modelo local (Room). Reglas comunes a TODAS las tablas, pensadas para la
-//  futura sincronización con el servidor propio:
+//  sincronización con el servidor propio:
 //    • id        → UUID en texto, generado en el móvil (nunca autoincremental)
-//    • updatedAt → epoch ms de la última modificación (el sync empuja lo > lastSync)
+//    • updatedAt → epoch ms de la última modificación (gana la más reciente)
 //    • deletedAt → borrado lógico; null = vivo. Nunca se borra una fila de verdad.
+//    • dirty     → cambio local aún no subido al servidor (no viaja en la sincronización)
+//  Sin claves foráneas: los registros pueden llegar del servidor en cualquier
+//  orden; las consultas ya filtran por padres vivos con JOIN.
+//  @Serializable: el contenido de cada fila viaja tal cual en la sincronización.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Catálogo de ejercicios: los globales (userId = null) y los personalizados. */
+@Serializable
 @Entity(
     tableName = "exercises",
     indices = [Index("name"), Index("userId")]
 )
 data class ExerciseEntity(
     @PrimaryKey val id: String,
-    val userId: String?,              // null = catálogo global
+    val userId: String?,              // null = catálogo global (no se sincroniza)
     val name: String,
     val nameEs: String?,
     val mainGroup: String,
@@ -36,11 +43,13 @@ data class ExerciseEntity(
     val isCustom: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @Transient @ColumnInfo(defaultValue = "1") val dirty: Boolean = true
 )
 
 // ─── Rutinas (plantillas) ─────────────────────────────────────────────────────
 
+@Serializable
 @Entity(tableName = "routines", indices = [Index("userId")])
 data class RoutineEntity(
     @PrimaryKey val id: String,
@@ -48,36 +57,29 @@ data class RoutineEntity(
     val name: String,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @Transient @ColumnInfo(defaultValue = "1") val dirty: Boolean = true
 )
 
-@Entity(
-    tableName = "routine_exercises",
-    foreignKeys = [ForeignKey(
-        entity = RoutineEntity::class, parentColumns = ["id"], childColumns = ["routineId"]
-    )],
-    indices = [Index("routineId"), Index("exerciseId")]
-)
+@Serializable
+@Entity(tableName = "routine_exercises", indices = [Index("routineId"), Index("exerciseId")])
 data class RoutineExerciseEntity(
     @PrimaryKey val id: String,
     val routineId: String,
     val exerciseId: String?,          // null si el nombre no está en el catálogo
     val exerciseName: String,         // desnormalizado: la UI y el historial van por nombre
+    val mainGroup: String? = null,    // desnormalizado: grupo muscular al guardar
     val position: Int,
     val notes: String,
     val supersetGroup: String? = null,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @Transient @ColumnInfo(defaultValue = "1") val dirty: Boolean = true
 )
 
-@Entity(
-    tableName = "routine_sets",
-    foreignKeys = [ForeignKey(
-        entity = RoutineExerciseEntity::class, parentColumns = ["id"], childColumns = ["routineExerciseId"]
-    )],
-    indices = [Index("routineExerciseId")]
-)
+@Serializable
+@Entity(tableName = "routine_sets", indices = [Index("routineExerciseId")])
 data class RoutineSetEntity(
     @PrimaryKey val id: String,
     val routineExerciseId: String,
@@ -88,11 +90,13 @@ data class RoutineSetEntity(
     val targetTimeSeconds: Int,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @Transient @ColumnInfo(defaultValue = "1") val dirty: Boolean = true
 )
 
 // ─── Entrenamientos realizados (historial) ────────────────────────────────────
 
+@Serializable
 @Entity(tableName = "workouts", indices = [Index("userId"), Index("startedAt")])
 data class WorkoutEntity(
     @PrimaryKey val id: String,
@@ -105,14 +109,13 @@ data class WorkoutEntity(
     val notes: String,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @Transient @ColumnInfo(defaultValue = "1") val dirty: Boolean = true
 )
 
+@Serializable
 @Entity(
     tableName = "workout_exercises",
-    foreignKeys = [ForeignKey(
-        entity = WorkoutEntity::class, parentColumns = ["id"], childColumns = ["workoutId"]
-    )],
     indices = [Index("workoutId"), Index("exerciseId"), Index("exerciseName")]
 )
 data class WorkoutExerciseEntity(
@@ -120,22 +123,19 @@ data class WorkoutExerciseEntity(
     val workoutId: String,
     val exerciseId: String?,
     val exerciseName: String,
+    val mainGroup: String? = null,
     val position: Int,
     val notes: String,
     val supersetGroup: String? = null,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @Transient @ColumnInfo(defaultValue = "1") val dirty: Boolean = true
 )
 
 /** Una fila por serie: es la base de la progresión, los récords y el 1RM. */
-@Entity(
-    tableName = "workout_sets",
-    foreignKeys = [ForeignKey(
-        entity = WorkoutExerciseEntity::class, parentColumns = ["id"], childColumns = ["workoutExerciseId"]
-    )],
-    indices = [Index("workoutExerciseId")]
-)
+@Serializable
+@Entity(tableName = "workout_sets", indices = [Index("workoutExerciseId")])
 data class WorkoutSetEntity(
     @PrimaryKey val id: String,
     val workoutExerciseId: String,
@@ -148,11 +148,13 @@ data class WorkoutSetEntity(
     val completed: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @Transient @ColumnInfo(defaultValue = "1") val dirty: Boolean = true
 )
 
 // ─── Resto de datos del usuario ───────────────────────────────────────────────
 
+@Serializable
 @Entity(tableName = "body_measurements", indices = [Index("userId"), Index("measuredAt")])
 data class BodyMeasurementEntity(
     @PrimaryKey val id: String,
@@ -167,9 +169,11 @@ data class BodyMeasurementEntity(
     val thighCm: Double,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @Transient @ColumnInfo(defaultValue = "1") val dirty: Boolean = true
 )
 
+@Serializable
 @Entity(tableName = "schedules", indices = [Index("userId")])
 data class ScheduleEntity(
     @PrimaryKey val id: String,
@@ -185,9 +189,11 @@ data class ScheduleEntity(
     val endDate: Long,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @Transient @ColumnInfo(defaultValue = "1") val dirty: Boolean = true
 )
 
+@Serializable
 @Entity(
     tableName = "achievements",
     indices = [Index(value = ["userId", "achievementKey"], unique = true)]
@@ -199,5 +205,6 @@ data class AchievementEntity(
     val unlockedAt: Long,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @Transient @ColumnInfo(defaultValue = "1") val dirty: Boolean = true
 )

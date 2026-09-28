@@ -4,7 +4,15 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.compose'   // Compose compiler plugin (Kotlin 2.0+)
     id 'com.google.gms.google-services'
     id 'com.google.devtools.ksp'
+    id 'org.jetbrains.kotlin.plugin.serialization'
 }
+
+// URL del servidor propio (opcional): en local.properties → gymflow.syncUrl=https://tu-dominio
+// También se puede cambiar desde la app (Perfil → Sincronización).
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) localPropsFile.withInputStream { localProps.load(it) }
+def syncUrl = localProps.getProperty('gymflow.syncUrl', '')
 
 ksp {
     // Guarda el esquema de cada versión de la BD (necesario para migraciones futuras)
@@ -26,6 +34,7 @@ android {
         vectorDrawables {
             useSupportLibrary true
         }
+        buildConfigField "String", "SYNC_URL", "\"${syncUrl}\""
     }
 
     buildTypes {
@@ -43,6 +52,11 @@ android {
     }
     buildFeatures {
         compose true
+        buildConfig true
+    }
+    sourceSets {
+        // Esquemas exportados de Room: los usa el test de migraciones
+        androidTest.assets.srcDirs += files("$projectDir/schemas")
     }
     // composeOptions ya NO hace falta con Kotlin 2.0+ (el compilador viene en el plugin)
 }
@@ -83,8 +97,17 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("io.coil-kt:coil-gif:2.6.0")
 
+    // Sincronización con el servidor propio
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'androidx.work:work-runtime-ktx:2.10.0'
+
+    // Tests en el PC (JVM): formato de sincronización
+    testImplementation 'junit:junit:4.13.2'
+
     // Tests en dispositivo (base de datos Room)
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1'
+    androidTestImplementation 'androidx.room:room-testing:2.6.1'
 }

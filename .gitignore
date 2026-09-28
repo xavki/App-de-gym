@@ -4,3 +4,8 @@ build/
 local.properties
 .idea/
 App-de-gym.git/
+
+# Despliegue: secretos y copias locales
+deploy/.env
+deploy/backups/
+.kotlin/

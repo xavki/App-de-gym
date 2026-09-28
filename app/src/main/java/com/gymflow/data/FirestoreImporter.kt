@@ -68,31 +68,48 @@ object FirestoreImporter {
             // Catálogo primero, para poder enlazar exerciseId por nombre
             ensureCatalog(repo, db)
 
+            // Reglas para no pisar nunca datos más nuevos (p. ej. ya sincronizados desde
+            // otro móvil): se salta lo que ya existe, y lo importado lleva una fecha de
+            // modificación antigua (IMPORTED_AT) para que cualquier edición real gane.
+            val old = GymRepository.IMPORTED_AT
+            val id = GymRepository::stableUuid
+
             user.collection("custom_exercises").get(Source.SERVER).await()
                 .toObjects(CustomExercise::class.java)
-                .forEach { repo.saveCustomExercise(uid, it) }
+                .map { it.copy(id = id(it.id)) }
+                .filterNot { repo.hasExercise(it.id) }
+                .forEach { repo.saveCustomExercise(uid, it, at = old) }
 
             user.collection("routines").get(Source.SERVER).await()
                 .toObjects(WorkoutSession::class.java)
-                .forEach { repo.saveRoutine(uid, it) }
+                .map { it.copy(id = id(it.id)) }
+                .filterNot { repo.hasRoutine(it.id) }
+                .forEach { repo.saveRoutine(uid, it, at = old) }
 
-            // El id de Firestore se convierte en UUID estable → reimportar no duplica
+            // El id de Firestore se convierte en UUID estable → reimportar no duplica.
+            // Los entrenos ya llevan su fecha real (antigua) como fecha de modificación.
             user.collection("workout_history").get(Source.SERVER).await().documents.forEach { doc ->
                 val w = doc.toObject(WorkoutSession::class.java) ?: return@forEach
+                val workoutId = id(doc.id)
+                if (repo.hasWorkout(workoutId)) return@forEach
                 repo.saveWorkout(
                     uid = uid, session = w, routineId = null,
-                    workoutId = GymRepository.stableUuid(doc.id),
+                    workoutId = workoutId,
                     startedAt = w.date.time, onlyLoggedSets = false, createdAt = w.date.time
                 )
             }
 
             user.collection("body_measurements").get(Source.SERVER).await()
                 .toObjects(BodyMeasurement::class.java)
-                .forEach { repo.saveMeasurement(uid, it) }
+                .map { it.copy(id = id(it.id)) }
+                .filterNot { repo.hasMeasurement(it.id) }
+                .forEach { repo.saveMeasurement(uid, it, at = old) }
 
             user.collection("schedules").get(Source.SERVER).await().documents.forEach { doc ->
+                val scheduleId = id(doc.getString("id") ?: doc.id)
+                if (repo.hasSchedule(scheduleId)) return@forEach
                 repo.saveSchedule(uid, ScheduledRoutine(
-                    id             = doc.getString("id") ?: doc.id,
+                    id             = scheduleId,
                     routineId      = doc.getString("routineId") ?: "",
                     routineName    = doc.getString("routineName") ?: "",
                     startDate      = doc.getLong("startDate") ?: 0L,
@@ -103,19 +120,20 @@ object FirestoreImporter {
                     weekDay        = (doc.getLong("weekDay") ?: 2L).toInt(),
                     endDate        = doc.getLong("endDate") ?: 0L,
                     userId         = uid
-                ))
+                ), at = old)
             }
 
             user.collection("achievements").get(Source.SERVER).await().documents.forEach { doc ->
-                val id = doc.getString("id") ?: return@forEach
-                val at = doc.getDate("unlockedAt")?.time ?: System.currentTimeMillis()
-                repo.unlockAchievement(uid, id, at)
+                val key = doc.getString("id") ?: return@forEach
+                if (repo.hasAchievement(uid, key)) return@forEach
+                val at = doc.getDate("unlockedAt")?.time ?: old
+                repo.unlockAchievement(uid, key, at)
             }
 
             prefs(context).edit().putBoolean(key, true).apply()
             Log.i(TAG, "Importación desde Firestore completada para $uid")
         } catch (e: Exception) {
-            // Se reintentará en el próximo arranque; lo ya importado se sobrescribe sin duplicar
+            // Se reintentará en el próximo arranque; lo ya importado se salta
             Log.w(TAG, "Importación incompleta: ${e.message}")
         }
     }
