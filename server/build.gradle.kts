@@ -53,6 +53,13 @@ tasks.test {
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }
 
+// El jar final junta todas las dependencias: los registros de META-INF/services de
+// flyway-core y flyway-database-postgresql deben fusionarse, o Flyway no encuentra
+// las migraciones (y la base de datos se queda sin tablas).
+tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
+    mergeServiceFiles()
+}
+
 // Servidor de desarrollo para pruebas de extremo a extremo (app en el emulador → este PC):
 // PostgreSQL embebido + claves de prueba. Nunca se usa en producción.
 tasks.register<JavaExec>("runDev") {
