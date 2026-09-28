@@ -121,6 +121,7 @@ class GymRepositoryTest {
     }
 
     @Test fun exportsJsonAndCsv() = runBlocking {
+        repo.saveCustomExercise(uid, com.gymflow.CustomExercise(name = "Bench Press", mainGroup = "Pecho"))
         val r = routine()
         r.exercises[0].sets.forEach { it.isCompleted = true }
         r.exercises[0].sets[0].rpe = 9.0
@@ -130,8 +131,9 @@ class GymRepositoryTest {
         DataExporter.exportJson(context, repo, uid, Uri.fromFile(json))
         val root = JSONObject(json.readText())
         assertEquals(DataExporter.SCHEMA_VERSION, root.getInt("schemaVersion"))
-        val set0 = root.getJSONArray("workouts").getJSONObject(0)
-            .getJSONArray("exercises").getJSONObject(0).getJSONArray("sets").getJSONObject(0)
+        val ex0 = root.getJSONArray("workouts").getJSONObject(0).getJSONArray("exercises").getJSONObject(0)
+        assertEquals("Pecho", ex0.getString("mainGroup"))
+        val set0 = ex0.getJSONArray("sets").getJSONObject(0)
         assertEquals(9.0, set0.getDouble("rpe"), 0.0)
 
         val csv = File(context.cacheDir, "export.csv")

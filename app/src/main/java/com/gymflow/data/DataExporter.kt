@@ -31,6 +31,9 @@ object DataExporter {
         val exByWorkout = s.workoutExercises.groupBy { it.workoutId }
         val rSetsByEx = s.routineSets.groupBy { it.routineExerciseId }
         val rExByRoutine = s.routineExercises.groupBy { it.routineId }
+        val catById = s.catalog.associateBy { it.id }
+        val catByName = s.catalog.associateBy { it.name }
+        fun groupOf(id: String?, name: String) = (id?.let { catById[it] } ?: catByName[name])?.mainGroup
 
         val root = linkedMapOf(
             "schemaVersion" to SCHEMA_VERSION,
@@ -45,6 +48,7 @@ object DataExporter {
                     "exercises" to exByWorkout[w.id].orEmpty().map { e ->
                         linkedMapOf(
                             "id" to e.id, "exerciseId" to e.exerciseId, "name" to e.exerciseName,
+                            "mainGroup" to groupOf(e.exerciseId, e.exerciseName),
                             "position" to e.position, "notes" to e.notes, "supersetGroup" to e.supersetGroup,
                             "sets" to setsByEx[e.id].orEmpty().map { st ->
                                 linkedMapOf(
@@ -63,6 +67,7 @@ object DataExporter {
                     "exercises" to rExByRoutine[r.id].orEmpty().map { e ->
                         linkedMapOf(
                             "id" to e.id, "exerciseId" to e.exerciseId, "name" to e.exerciseName,
+                            "mainGroup" to groupOf(e.exerciseId, e.exerciseName),
                             "position" to e.position, "notes" to e.notes,
                             "sets" to rSetsByEx[e.id].orEmpty().map { st ->
                                 linkedMapOf(

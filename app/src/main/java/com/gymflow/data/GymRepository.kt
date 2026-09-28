@@ -308,7 +308,8 @@ class GymRepository(private val db: GymDatabase) {
         workoutSets = dao.workoutSets(uid),
         bodyMeasurements = dao.measurements(uid),
         schedules = dao.schedules(uid),
-        achievements = dao.achievements(uid)
+        achievements = dao.achievements(uid),
+        catalog = dao.allExercisesFor(uid)
     )
 
     data class RawSnapshot(
@@ -321,7 +322,8 @@ class GymRepository(private val db: GymDatabase) {
         val workoutSets: List<WorkoutSetEntity>,
         val bodyMeasurements: List<BodyMeasurementEntity>,
         val schedules: List<ScheduleEntity>,
-        val achievements: List<AchievementEntity>
+        val achievements: List<AchievementEntity>,
+        val catalog: List<ExerciseEntity>   // global + personalizados, para resolver grupo muscular
     )
 
     // ══════════════════════════════════════════════════════════════════════════
