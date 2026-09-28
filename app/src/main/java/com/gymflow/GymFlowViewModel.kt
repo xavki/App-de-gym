@@ -5,14 +5,24 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import android.net.Uri
 import com.google.firebase.firestore.FirebaseFirestore
+import com.gymflow.data.DataExporter
+import com.gymflow.data.FirestoreImporter
+import com.gymflow.data.GymRepository
 import kotlinx.coroutines.*
 import java.util.Calendar
 import java.util.Date
 
+/**
+ * Los datos viven en Room (GymRepository): todo funciona sin conexión.
+ * Firebase solo se usa para el login y para la importación inicial desde Firestore.
+ */
 class GymFlowViewModel(
     private val auth: FirebaseAuth,
-    private val db: FirebaseFirestore
+    private val db: FirebaseFirestore,
+    private val repo: GymRepository,
+    private val appContext: Context
 ) : ViewModel() {
 
     // ─── Rutinas e historial ────────────────────────────────────────────────
@@ -64,17 +74,26 @@ class GymFlowViewModel(
 
     init {
         auth.addAuthStateListener { firebaseAuth ->
-            if (firebaseAuth.currentUser == null) {
+            val user = firebaseAuth.currentUser
+            if (user == null) {
                 clearData()
             } else {
-                loadRoutines()
-                loadHistory()
-                loadSchedules()
-                loadMeasurements()
-                loadCustomExercises()
-                loadAchievements()
+                viewModelScope.launch {
+                    loadAll()   // lo local aparece al instante
+                    FirestoreImporter.importUserDataIfNeeded(appContext, repo, db, user.uid)
+                    loadAll()
+                }
             }
         }
+    }
+
+    private fun loadAll() {
+        loadRoutines()
+        loadHistory()
+        loadSchedules()
+        loadMeasurements()
+        loadCustomExercises()
+        loadAchievements()
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -129,44 +148,25 @@ class GymFlowViewModel(
 
         routine.durationSeconds = totalSeconds
         routine.userId = user.uid
-
-        RoutineRepository.saveHistory(user.uid, routine)
-        saveExerciseHistory(user.uid, routine)
+        val startedAt = System.currentTimeMillis() - totalSeconds * 1000L
 
         val cleanedExercises = routine.exercises.map { ex ->
-            ex.copy(sets = ex.sets.map { it.copy(isCompleted = false) }.toMutableList())
+            ex.copy(sets = ex.sets.map { it.copy(isCompleted = false, rpe = null) }.toMutableList())
         }.toMutableList()
-        syncRoutine(routine.copy(exercises = cleanedExercises))
 
         activeWorkout = null
         activeWorkoutExerciseIndex = 0
         restTimerSeconds = 60
         restTimerRunning = false
         totalSeconds = 0
-        loadHistory()
 
-        // Comprobar logros diferidos (necesitamos history actualizado)
         viewModelScope.launch {
-            delay(1500)
+            repo.saveWorkout(user.uid, routine, routineId = routine.id, startedAt = startedAt)
+            // La rutina recuerda los últimos pesos usados
+            repo.saveRoutine(user.uid, routine.copy(exercises = cleanedExercises))
+            reloadRoutines(user.uid)
+            reloadHistory(user.uid)
             checkAchievements(routine)
-        }
-    }
-
-    private fun saveExerciseHistory(userId: String, routine: WorkoutSession) {
-        routine.exercises.forEach { exercise ->
-            val completedSets = exercise.sets.filter { it.isCompleted || it.weight > 0 || it.repetitions > 0 || it.timeSeconds > 0 }
-            if (completedSets.isNotEmpty()) {
-                val entry = ExerciseHistoryEntry(
-                    userId       = userId,
-                    exerciseName = exercise.exerciseName,
-                    date         = Date(),
-                    sets         = completedSets.map { it.copy() }
-                )
-                db.collection("users").document(userId)
-                    .collection("exercise_history")
-                    .document(entry.id)
-                    .set(entry)
-            }
         }
     }
 
@@ -176,7 +176,8 @@ class GymFlowViewModel(
 
     fun loadSchedules() {
         val uid = auth.currentUser?.uid ?: return
-        ScheduleRepository.loadSchedules(uid) { loaded ->
+        viewModelScope.launch {
+            val loaded = repo.schedules(uid)
             scheduledRoutines.clear()
             scheduledRoutines.addAll(loaded)
         }
@@ -185,24 +186,26 @@ class GymFlowViewModel(
     fun saveSchedule(context: Context, schedule: ScheduledRoutine) {
         val uid = auth.currentUser?.uid ?: return
         val s = schedule.copy(userId = uid)
-        ScheduleRepository.saveSchedule(uid, s) { success ->
-            if (success) {
+        viewModelScope.launch {
+            try {
+                repo.saveSchedule(uid, s)
                 scheduledRoutines.removeAll { it.id == s.id }
                 scheduledRoutines.add(s)
                 NotificationHelper.scheduleAlarm(context, s)
-            } else {
+            } catch (e: Exception) {
                 errorMessage = "Error al guardar la programación"
             }
         }
     }
 
     fun deleteSchedule(context: Context, schedule: ScheduledRoutine) {
-        val uid = auth.currentUser?.uid ?: return
-        ScheduleRepository.deleteSchedule(uid, schedule.id) { success ->
-            if (success) {
+        auth.currentUser ?: return
+        viewModelScope.launch {
+            try {
+                repo.deleteSchedule(schedule.id)
                 scheduledRoutines.removeAll { it.id == schedule.id }
                 NotificationHelper.cancelAlarm(context, schedule)
-            } else {
+            } catch (e: Exception) {
                 errorMessage = "Error al eliminar la programación"
             }
         }
@@ -214,22 +217,28 @@ class GymFlowViewModel(
 
     fun loadRoutines() {
         val user = auth.currentUser ?: return
-        isLoadingRoutines = true
-        RoutineRepository.loadRoutines(user.uid) { loaded ->
-            routines.clear()
-            routines.addAll(loaded)
-            isLoadingRoutines = false
-        }
+        viewModelScope.launch { reloadRoutines(user.uid) }
     }
 
     fun loadHistory() {
         val user = auth.currentUser ?: return
+        viewModelScope.launch { reloadHistory(user.uid) }
+    }
+
+    private suspend fun reloadRoutines(uid: String) {
+        isLoadingRoutines = true
+        val loaded = repo.routines(uid)
+        routines.clear()
+        routines.addAll(loaded)
+        isLoadingRoutines = false
+    }
+
+    private suspend fun reloadHistory(uid: String) {
         isLoadingHistory = true
-        RoutineRepository.loadWorkoutHistory(user.uid) { loaded ->
-            workoutHistory.clear()
-            workoutHistory.addAll(loaded)
-            isLoadingHistory = false
-        }
+        val loaded = repo.workouts(uid)
+        workoutHistory.clear()
+        workoutHistory.addAll(loaded)
+        isLoadingHistory = false
     }
 
     fun copyRoutine(routine: WorkoutSession) {
@@ -250,13 +259,12 @@ class GymFlowViewModel(
     fun syncRoutine(routine: WorkoutSession, delete: Boolean = false) {
         val user = auth.currentUser ?: return
         routine.userId = user.uid
-        if (delete) {
-            RoutineRepository.deleteRoutine(user.uid, routine.id) { success ->
-                if (!success) errorMessage = "Error al borrar" else loadRoutines()
-            }
-        } else {
-            RoutineRepository.saveRoutine(user.uid, routine) { success ->
-                if (!success) errorMessage = "Error al guardar" else loadRoutines()
+        viewModelScope.launch {
+            try {
+                if (delete) repo.deleteRoutine(routine.id) else repo.saveRoutine(user.uid, routine)
+                reloadRoutines(user.uid)
+            } catch (e: Exception) {
+                errorMessage = if (delete) "Error al borrar" else "Error al guardar"
             }
         }
     }
@@ -330,40 +338,31 @@ class GymFlowViewModel(
     fun loadMeasurements() {
         val uid = auth.currentUser?.uid ?: return
         isLoadingMeasurements = true
-        db.collection("users").document(uid)
-            .collection("body_measurements")
-            .orderBy("date")
-            .get()
-            .addOnSuccessListener { snap ->
-                bodyMeasurements.clear()
-                snap.documents.mapNotNull { it.toObject(BodyMeasurement::class.java) }
-                    .let { bodyMeasurements.addAll(it) }
-                isLoadingMeasurements = false
-            }
-            .addOnFailureListener { isLoadingMeasurements = false }
+        viewModelScope.launch {
+            val loaded = repo.measurements(uid)
+            bodyMeasurements.clear()
+            bodyMeasurements.addAll(loaded)
+            isLoadingMeasurements = false
+        }
     }
 
     fun saveMeasurement(measurement: BodyMeasurement) {
         val uid = auth.currentUser?.uid ?: return
         val m = measurement.copy(userId = uid)
-        db.collection("users").document(uid)
-            .collection("body_measurements")
-            .document(m.id)
-            .set(m)
-            .addOnSuccessListener {
-                bodyMeasurements.removeAll { it.id == m.id }
-                bodyMeasurements.add(m)
-                bodyMeasurements.sortBy { it.date }
-            }
+        viewModelScope.launch {
+            repo.saveMeasurement(uid, m)
+            bodyMeasurements.removeAll { it.id == m.id }
+            bodyMeasurements.add(m)
+            bodyMeasurements.sortBy { it.date }
+        }
     }
 
     fun deleteMeasurement(measurement: BodyMeasurement) {
-        val uid = auth.currentUser?.uid ?: return
-        db.collection("users").document(uid)
-            .collection("body_measurements")
-            .document(measurement.id)
-            .delete()
-            .addOnSuccessListener { bodyMeasurements.removeAll { it.id == measurement.id } }
+        auth.currentUser ?: return
+        viewModelScope.launch {
+            repo.deleteMeasurement(measurement.id)
+            bodyMeasurements.removeAll { it.id == measurement.id }
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -372,38 +371,31 @@ class GymFlowViewModel(
 
     fun loadCustomExercises() {
         val uid = auth.currentUser?.uid ?: return
-        db.collection("users").document(uid)
-            .collection("custom_exercises")
-            .get()
-            .addOnSuccessListener { snap ->
-                customExercises.clear()
-                snap.documents.mapNotNull { it.toObject(CustomExercise::class.java) }
-                    .let { customExercises.addAll(it) }
-            }
+        viewModelScope.launch {
+            val loaded = repo.customExercises(uid)
+            customExercises.clear()
+            customExercises.addAll(loaded)
+        }
     }
 
     fun saveCustomExercise(exercise: CustomExercise) {
         val uid = auth.currentUser?.uid ?: return
         val ex = exercise.copy(userId = uid)
-        db.collection("users").document(uid)
-            .collection("custom_exercises")
-            .document(ex.id)
-            .set(ex)
-            .addOnSuccessListener {
-                customExercises.removeAll { it.id == ex.id }
-                customExercises.add(ex)
-                // Comprobar logro "Creador"
-                if (customExercises.size == 1) unlockAchievement("custom_exercise")
-            }
+        viewModelScope.launch {
+            repo.saveCustomExercise(uid, ex)
+            customExercises.removeAll { it.id == ex.id }
+            customExercises.add(ex)
+            // Comprobar logro "Creador"
+            if (customExercises.size == 1) unlockAchievement("custom_exercise")
+        }
     }
 
     fun deleteCustomExercise(exercise: CustomExercise) {
-        val uid = auth.currentUser?.uid ?: return
-        db.collection("users").document(uid)
-            .collection("custom_exercises")
-            .document(exercise.id)
-            .delete()
-            .addOnSuccessListener { customExercises.removeAll { it.id == exercise.id } }
+        auth.currentUser ?: return
+        viewModelScope.launch {
+            repo.deleteCustomExercise(exercise.id)
+            customExercises.removeAll { it.id == exercise.id }
+        }
     }
 
     /** Devuelve la lista combinada de ejercicios del repositorio + personalizados como ExerciseDefinition */
@@ -444,18 +436,11 @@ class GymFlowViewModel(
 
     fun loadAchievements() {
         val uid = auth.currentUser?.uid ?: return
-        db.collection("users").document(uid)
-            .collection("achievements")
-            .get()
-            .addOnSuccessListener { snap ->
-                val unlockedIds = snap.documents.mapNotNull { it.getString("id") }.toSet()
-                achievements.clear()
-                AchievementCatalog.all.forEach { a ->
-                    val ts = snap.documents.find { it.getString("id") == a.id }
-                        ?.getDate("unlockedAt")
-                    achievements.add(a.copy(unlockedAt = ts))
-                }
-            }
+        viewModelScope.launch {
+            val loaded = repo.achievements(uid)
+            achievements.clear()
+            achievements.addAll(loaded)
+        }
     }
 
     private fun unlockAchievement(id: String) {
@@ -466,10 +451,7 @@ class GymFlowViewModel(
         val unlocked = achievements[idx].copy(unlockedAt = now)
         achievements[idx] = unlocked
         newAchievement = unlocked
-        db.collection("users").document(uid)
-            .collection("achievements")
-            .document(id)
-            .set(mapOf("id" to id, "unlockedAt" to now))
+        viewModelScope.launch { repo.unlockAchievement(uid, id, now.time) }
     }
 
     fun checkAchievements(lastWorkout: WorkoutSession? = null) {
@@ -494,6 +476,28 @@ class GymFlowViewModel(
         // PR desbloqueado (ya se detecta en WorkoutScreen → viewModel.newPersonalRecord)
         if (achievements.none { it.id == "first_pr" && it.unlockedAt != null } && newPersonalRecord != null) {
             unlockAchievement("first_pr")
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // EXPORTAR (JSON / CSV)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** Escribe la exportación en el archivo elegido por el usuario. Devuelve éxito o error por callback. */
+    fun exportData(target: Uri, asCsv: Boolean, onDone: (Boolean) -> Unit) {
+        val uid = auth.currentUser?.uid ?: return onDone(false)
+        viewModelScope.launch {
+            val ok = try {
+                withContext(Dispatchers.IO) {
+                    if (asCsv) DataExporter.exportCsv(appContext, repo, uid, target)
+                    else DataExporter.exportJson(appContext, repo, uid, target)
+                }
+                true
+            } catch (e: Exception) {
+                errorMessage = "Error al exportar: ${e.message}"
+                false
+            }
+            onDone(ok)
         }
     }
 

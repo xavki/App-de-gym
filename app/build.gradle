@@ -3,6 +3,12 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'   // Compose compiler plugin (Kotlin 2.0+)
     id 'com.google.gms.google-services'
+    id 'com.google.devtools.ksp'
+}
+
+ksp {
+    // Guarda el esquema de cada versión de la BD (necesario para migraciones futuras)
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 android {
@@ -68,6 +74,7 @@ dependencies {
     // Room
     implementation "androidx.room:room-runtime:2.6.1"
     implementation "androidx.room:room-ktx:2.6.1"
+    ksp "androidx.room:room-compiler:2.6.1"
 
     // Gson
     implementation 'com.google.code.gson:gson:2.10.1'
@@ -75,4 +82,9 @@ dependencies {
     // Coil
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("io.coil-kt:coil-gif:2.6.0")
+
+    // Tests en dispositivo (base de datos Room)
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1'
 }

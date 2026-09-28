@@ -1,52 +1,20 @@
 package com.gymflow
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.gymflow.data.FirestoreImporter
+import com.gymflow.data.GymRepository
 
 object ExerciseRepository {
 
-    // Cache en memoria para no llamar Firestore cada vez
+    // Cache en memoria para no ir a la base de datos cada vez
     private var cachedExercises: List<ExerciseDefinition> = emptyList()
 
-    fun loadExercises(
-        db: FirebaseFirestore,
-        onResult: (List<ExerciseDefinition>) -> Unit
-    ) {
-        // Si ya están cargados, devuelve el cache
-        if (cachedExercises.isNotEmpty()) {
-            onResult(cachedExercises)
-            return
+    /** Catálogo desde Room; solo se descarga de Firestore la primera vez. */
+    suspend fun loadExercises(repo: GymRepository, db: FirebaseFirestore): List<ExerciseDefinition> {
+        if (cachedExercises.isEmpty()) {
+            cachedExercises = FirestoreImporter.ensureCatalog(repo, db).sortedBy { it.name }
         }
-
-        db.collection("exercises")
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val exercises = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        ExerciseDefinition(
-                            name          = doc.getString("name")         ?: return@mapNotNull null,
-                            mainGroup     = doc.getString("mainGroup")    ?: "",
-                            musclesUsed   = doc.getString("musclesUsed")  ?: "",
-                            instructions  = doc.getString("instructions") ?: "",
-                            gifUrl        = doc.getString("gifUrl"),
-                            imageUrl      = doc.getString("imageUrl"),
-                            subCategory   = doc.getString("subCategory"),
-                            difficulty    = doc.getString("difficulty"),
-                            equipment     = doc.getString("equipment"),
-                            nameEs        = doc.getString("nameEs"),
-                            instructionsEs = doc.getString("instructionsEs")
-                        )
-                    } catch (e: Exception) {
-                        null
-                    }
-                }.sortedBy { it.name }
-
-                cachedExercises = exercises
-                onResult(exercises)
-            }
-            .addOnFailureListener {
-                // Si falla Firestore, devuelve lista vacía
-                onResult(emptyList())
-            }
+        return cachedExercises
     }
 
     // Para acceso sincrónico cuando ya está cacheado

@@ -27,6 +27,7 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
+import com.gymflow.data.GymRepository
 import kotlinx.coroutines.launch
 
 enum class Screen {
@@ -84,7 +85,9 @@ class MainActivity : ComponentActivity() {
         )
         
         setContent {
-            val viewModel: GymFlowViewModel = remember { GymFlowViewModel(auth, db) }
+            val viewModel: GymFlowViewModel = remember {
+                GymFlowViewModel(auth, db, GymRepository.get(applicationContext), applicationContext)
+            }
             
             GymFlowApp(
                 viewModel     = viewModel,
@@ -144,12 +147,15 @@ fun GymFlowApp(
     var firestoreExercises by remember { mutableStateOf<List<ExerciseDefinition>>(emptyList()) }
     var isLoadingExercises by remember { mutableStateOf(true) }
 
-    // Cargar ejercicios UNA sola vez al arrancar
-    LaunchedEffect(Unit) {
-        ExerciseRepository.loadExercises(FirebaseService.db) { exercises ->
-            firestoreExercises = exercises
-            isLoadingExercises = false
+    // Cargar ejercicios (Room; Firestore solo la primera vez, y exige estar logueado:
+    // por eso se reintenta al salir del login si aún no hay catálogo)
+    val context = LocalContext.current
+    val loggedIn = currentScreen != Screen.LOGIN
+    LaunchedEffect(loggedIn) {
+        if (firestoreExercises.isEmpty()) {
+            firestoreExercises = ExerciseRepository.loadExercises(GymRepository.get(context), FirebaseService.db)
         }
+        isLoadingExercises = false
     }
 
     // Limpiar y recargar datos cada vez que cambie la pantalla o el usuario

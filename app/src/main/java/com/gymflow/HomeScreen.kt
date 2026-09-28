@@ -1,5 +1,9 @@
 package com.gymflow
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.gymflow.data.DataExporter
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -661,6 +665,12 @@ fun ProfileScreen(
             }
         }
 
+        // ── Exportar datos ──────────────────────────────────────────────────
+        item {
+            Spacer(Modifier.height(24.dp))
+            ExportDataSection(viewModel)
+        }
+
         // ── Botón cerrar sesión ─────────────────────────────────────────────
         item {
             Spacer(Modifier.height(24.dp))
@@ -676,6 +686,48 @@ fun ProfileScreen(
                 Text(stringResource(R.string.profile_logout), fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+/** Exporta todo a JSON (panel web / copia) o las series a CSV, en el archivo que elija el usuario. */
+@Composable
+fun ExportDataSection(viewModel: GymFlowViewModel) {
+    val context = LocalContext.current
+    val onDone: (Boolean) -> Unit = { ok ->
+        Toast.makeText(context, if (ok) "Datos exportados" else "No se pudo exportar", Toast.LENGTH_SHORT).show()
+    }
+    val jsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let { viewModel.exportData(it, asCsv = false, onDone = onDone) }
+    }
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        uri?.let { viewModel.exportData(it, asCsv = true, onDone = onDone) }
+    }
+
+    Text("EXPORTAR DATOS", color = TextSecondary, fontWeight = FontWeight.Black, fontSize = 12.sp, letterSpacing = 1.sp)
+    Spacer(Modifier.height(12.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick  = { jsonLauncher.launch(DataExporter.suggestedName("json")) },
+            modifier = Modifier.weight(1f),
+            shape    = RoundedCornerShape(16.dp),
+            border   = BorderStroke(1.dp, AccentCyan.copy(alpha = 0.4f)),
+            colors   = ButtonDefaults.outlinedButtonColors(contentColor = AccentCyan)
+        ) {
+            Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("JSON", fontWeight = FontWeight.Bold)
+        }
+        OutlinedButton(
+            onClick  = { csvLauncher.launch(DataExporter.suggestedName("csv")) },
+            modifier = Modifier.weight(1f),
+            shape    = RoundedCornerShape(16.dp),
+            border   = BorderStroke(1.dp, AccentCyan.copy(alpha = 0.4f)),
+            colors   = ButtonDefaults.outlinedButtonColors(contentColor = AccentCyan)
+        ) {
+            Icon(Icons.Default.TableChart, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("CSV", fontWeight = FontWeight.Bold)
         }
     }
 }

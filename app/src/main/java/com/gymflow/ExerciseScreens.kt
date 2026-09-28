@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Build
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -544,18 +545,13 @@ fun ExerciseInfoScreen(exerciseName: String, onBack: () -> Unit) {
     val definition = ExerciseRepository.getCached().find { it.name == exerciseName }
     var history by remember { mutableStateOf<List<ExerciseHistoryEntry>>(emptyList()) }
     val userId = FirebaseAuth.getInstance().currentUser?.uid
-    val db = FirebaseFirestore.getInstance()
+    val context = LocalContext.current
 
     LaunchedEffect(exerciseName) {
         if (userId != null) {
-            db.collection("users").document(userId)
-                .collection("exercise_history")
-                .whereEqualTo("exerciseName", exerciseName)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    val entries = snapshot.toObjects(ExerciseHistoryEntry::class.java)
-                    history = entries.sortedByDescending { it.date }
-                }
+            history = com.gymflow.data.GymRepository.get(context)
+                .exerciseHistory(userId, exerciseName)
+                .sortedByDescending { it.date }
         }
     }
 

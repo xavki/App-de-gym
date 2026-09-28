@@ -378,7 +378,7 @@ fun WorkoutScreen(
                                                 set.weight = it.toDoubleOrNull() ?: 0.0
                                             },
                                             label = { Text("KG", fontSize = 10.sp) },
-                                            modifier = Modifier.width(80.dp),
+                                            modifier = Modifier.width(76.dp),
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             singleLine = true,
                                             colors = OutlinedTextFieldDefaults.colors(
@@ -399,8 +399,30 @@ fun WorkoutScreen(
                                                 set.repetitions = it.toIntOrNull() ?: 0
                                             },
                                             label = { Text("REPS", fontSize = 10.sp) },
-                                            modifier = Modifier.width(80.dp),
+                                            modifier = Modifier.width(72.dp),
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = AccentCyan,
+                                                unfocusedBorderColor = Color.DarkGray,
+                                                focusedTextColor = TextPrimary,
+                                                unfocusedTextColor = TextPrimary
+                                            )
+                                        )
+
+                                        Spacer(Modifier.width(8.dp))
+
+                                        // RPE opcional (1-10): esfuerzo percibido de la serie
+                                        var rpeText by remember(set.id) { mutableStateOf(set.rpe?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "") }
+                                        OutlinedTextField(
+                                            value = rpeText,
+                                            onValueChange = {
+                                                rpeText = it
+                                                set.rpe = it.replace(',', '.').toDoubleOrNull()?.takeIf { v -> v in 1.0..10.0 }
+                                            },
+                                            label = { Text("RPE", fontSize = 10.sp) },
+                                            modifier = Modifier.width(60.dp),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                             singleLine = true,
                                             colors = OutlinedTextFieldDefaults.colors(
                                                 focusedBorderColor = AccentCyan,
