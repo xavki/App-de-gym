@@ -45,7 +45,10 @@ import java.time.Clock
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.minutes
 
-/** Quién hace la petición: la app (token de Firebase) o un panel vinculado (solo lectura). */
+internal const val CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
+    "connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+
+/** Quién hace la petición: la app (token de Firebase) o un panel vinculado (lee todo; solo escribe nutrición). */
 data class UserPrincipal(val uid: String, val email: String?, val panel: Boolean = false)
 
 private const val MAX_CHANGES_PER_PUSH = 2000
@@ -58,8 +61,16 @@ fun Application.module(config: AppConfig, database: Database, clock: Clock = Clo
     val sync = SyncRepository(database)
     val pairing = PairingRepository(database, clock)
     val exporter = ExportService(sync, clock)
+    val nutrition = NutritionRepository(database)
 
-    install(DefaultHeaders)
+    install(DefaultHeaders) {
+        // El panel guarda su token en localStorage: la CSP impide cargar o inyectar scripts ajenos
+        // (el panel compilado no usa scripts ni estilos en línea), y nadie puede incrustarlo en un iframe.
+        header("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+        header("X-Content-Type-Options", "nosniff")
+        header("X-Frame-Options", "DENY")
+        header("Referrer-Policy", "no-referrer")
+    }
     install(CallLogging) {
         level = Level.INFO
         filter { it.request.path().startsWith("/api") }
@@ -76,6 +87,8 @@ fun Application.module(config: AppConfig, database: Database, clock: Clock = Clo
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
         allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Patch)
     }
     install(RateLimit) {
         // Frena la fuerza bruta de códigos de vinculación
@@ -158,12 +171,13 @@ fun Application.module(config: AppConfig, database: Database, clock: Clock = Clo
             }
         }
 
-        // El panel vinculado solo puede leer la exportación
+        // El panel vinculado puede leer la exportación y gestionar su nutrición (nada más)
         authenticate("firebase", "panel", strategy = AuthenticationStrategy.FirstSuccessful) {
             get("/api/export") {
                 val user = call.user()
                 call.respond(withContext(Dispatchers.IO) { exporter.export(user.uid) })
             }
+            nutritionRoutes(nutrition, clock, config.nutritionZone)
         }
 
         rateLimit(RateLimitName("pairing")) {

@@ -48,7 +48,10 @@ Navegador (panel) ──────▶   │        (sirve también el panel we
 5. **En la app:** *Perfil → Sincronización → Servidor* → `https://TU_DOMINIO` → *Sincronizar*.
    Para el panel: *Vincular panel web*, abre `https://TU_DOMINIO` en el ordenador y escribe el código.
 6. **Copias de seguridad:** `crontab -e` y añade `0 4 * * * /home/ubuntu/App-de-gym/deploy/backup.sh`.
-   Restaurar: `gunzip -c backups/gymflow-FECHA.sql.gz | docker compose exec -T db psql -U gymflow gymflow`.
+   Cada copia es `backups/gymflow-FECHA-HORA.sql.gz`; si `pg_dump` o `gzip` fallan o el volcado queda
+   incompleto, el script sale con error, no deja archivo y no borra las anteriores
+   (pruebas sin Docker: `bash deploy/test/backup_test.sh`).
+   Restaurar: `gunzip -c backups/gymflow-FECHA-HORA.sql.gz | docker compose exec -T db psql -U gymflow gymflow`.
 
 ## Actualizar
 
@@ -57,6 +60,35 @@ cd App-de-gym && git pull && cd deploy && docker compose up -d --build
 ```
 
 Las migraciones de la base de datos se aplican solas al arrancar el servidor.
+
+## Publicar el módulo de nutrición (migraciones V2 y V3)
+
+Solo añaden tablas (`nutrition_*`); no tocan `users`, `records`, `pairing_codes` ni `panel_tokens`,
+y la app Android no cambia. Se aplican solas al arrancar el servidor nuevo (cada una en su transacción).
+
+1. **Guardar la imagen actual** para poder volver sin reconstruir: `docker tag deploy-server:latest deploy-server:pre-nutricion`
+2. **Copia verificada** (con `pipefail`: si `pg_dump` falla, el comando falla):
+   ```bash
+   bash -c 'set -euo pipefail; F=backups/pre-nutricion-$(date +%F-%H%M).sql.gz
+     docker compose exec -T db pg_dump -U gymflow gymflow | gzip > "$F"
+     gzip -t "$F" && zcat "$F" | tail -n 5 | grep -q "dump complete" && ls -lh "$F"'
+   ```
+3. **Construir sin parar nada:** `git pull && docker compose build server`
+4. **Arrancar el nuevo:** `docker compose up -d server` y `docker compose logs -f server` (debe
+   aplicar 2 y 3 y quedar escuchando).
+5. **Comprobar:** `/health`, sincronizar desde la app y la pestaña Nutrición.
+
+**Volver atrás (de menos a más drástico):**
+- *Solo el servidor (preferente, no toca datos):*
+  `docker tag deploy-server:pre-nutricion deploy-server:latest && docker compose up -d --no-build --force-recreate server`.
+  Arranca aunque la base tenga V2/V3 (Flyway ignora migraciones "futuras"); las tablas de nutrición quedan sin usar.
+- *Quitar también nutrición de la base* (pierde solo los registros de nutrición):
+  ```sql
+  DROP TABLE nutrition_goal_history, nutrition_logs, nutrition_goals, nutrition_meals;
+  DELETE FROM flyway_schema_history WHERE version IN ('2', '3');
+  ```
+- *Restaurar la copia completa* (último recurso: pierde lo sincronizado después de la copia; antes,
+  haz otra copia del estado actual).
 
 ## VM con 1 GB de RAM
 

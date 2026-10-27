@@ -7,15 +7,17 @@ import { RANGES, fmtDate, inRange, prepare, rangeBounds, type RangeKey } from '.
 import type { GymExport } from './types'
 import { Body } from './views/Body'
 import { Exercises } from './views/Exercises'
+import { Nutrition } from './views/Nutrition'
 import { Overview } from './views/Overview'
 import { Workouts } from './views/Workouts'
 
-type Tab = 'overview' | 'exercises' | 'body' | 'workouts'
+type Tab = 'overview' | 'exercises' | 'body' | 'workouts' | 'nutrition'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Resumen' },
   { key: 'exercises', label: 'Ejercicios' },
   { key: 'body', label: 'Cuerpo' },
   { key: 'workouts', label: 'Entrenos' },
+  { key: 'nutrition', label: 'Nutrición' }, // solo con el panel vinculado al servidor
 ]
 
 /** De dónde salen los datos que se ven. */
@@ -100,6 +102,25 @@ export default function App() {
       setError((e as Error).message)
     }
   }
+
+  /** El servidor rechazó el token (p. ej. se revocó desde la app): vuelta a la pantalla de vincular. */
+  const lostAccess = useCallback((message: string) => {
+    clearToken()
+    setState({ data: null, source: 'file' })
+    setError(message)
+  }, [])
+
+  const tabs = source === 'server' ? TABS : TABS.filter((t) => t.key !== 'nutrition')
+  /** La pestaña queda en la URL (?tab=…): recargar o un acceso directo en el móvil vuelve a ella. */
+  const selectTab = (key: Tab) => {
+    setTab(key)
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', key)
+      window.history.replaceState(null, '', url)
+    } catch { /* sin History API: solo no se recuerda */ }
+  }
+  const token = source === 'server' ? loadToken() : null
 
   const workouts = useMemo(() => (data ? prepare(data) : []), [data])
   const bounds = useMemo(() => (data ? rangeBounds(range, workouts, data.exportedAt) : null), [data, workouts, range])
@@ -190,25 +211,28 @@ export default function App() {
         <main className="content">
           <nav className="filters" aria-label="Filtros">
             <div className="tabs" role="tablist">
-              {TABS.map((t) => (
-                <button key={t.key} role="tab" aria-selected={tab === t.key} className={tab === t.key ? 'tab active' : 'tab'} onClick={() => setTab(t.key)}>
+              {tabs.map((t) => (
+                <button key={t.key} role="tab" aria-selected={tab === t.key} className={tab === t.key ? 'tab active' : 'tab'} onClick={() => selectTab(t.key)}>
                   {t.label}
                 </button>
               ))}
             </div>
-            <div className="segmented" role="radiogroup" aria-label="Rango de fechas">
+            {tab !== 'nutrition' && <div className="segmented" role="radiogroup" aria-label="Rango de fechas">
               {RANGES.map((r) => (
                 <button key={r.key} role="radio" aria-checked={range === r.key} className={range === r.key ? 'seg active' : 'seg'} onClick={() => setRange(r.key)}>
                   {r.label}
                 </button>
               ))}
-            </div>
+            </div>}
           </nav>
 
           {bounds && tab === 'overview' && <Overview workouts={inR} range={bounds} />}
           {bounds && tab === 'exercises' && <Exercises all={workouts} range={bounds} />}
           {bounds && tab === 'body' && <Body measurements={data.bodyMeasurements} range={bounds} />}
           {bounds && tab === 'workouts' && <Workouts workouts={inR} />}
+          {tab === 'nutrition' && (token
+            ? <Nutrition token={token} onUnauthorized={lostAccess} />
+            : <div className="empty big">La nutrición se guarda en tu servidor: vincula el panel con la app para usarla.</div>)}
         </main>
       )}
     </div>

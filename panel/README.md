@@ -39,3 +39,12 @@ series ni récords; el 1RM estimado solo usa series de 1 a 12 repeticiones.
 
 Cuando exista el backend, basta con añadir en `src/data.ts` una función que devuelva el mismo
 `GymExport` desde la API: el resto del panel no cambia.
+
+## Nutrición
+
+Pestaña **Nutrición** (solo con el panel vinculado a tu servidor): objetivos diarios, registro
+rápido de las comidas del plan (D1–D3, C1–C4, M1–M3, Cn1–Cn4), ajuste de raciones, historial
+de los últimos 30 días y edición de objetivos. A diferencia del resto del panel, esta pestaña
+**escribe** en el servidor (`/api/nutrition/*`): PostgreSQL es la fuente de verdad y el
+navegador no guarda nada. Cada registro lleva un UUID generado aquí, así que un reintento
+no crea duplicados. `?tab=nutrition` abre directamente esta pestaña.
