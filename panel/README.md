@@ -16,7 +16,7 @@ npm run dev          # http://localhost:5173
 ```
 
 - `http://localhost:5173/?demo` abre el panel con datos de ejemplo.
-- `?tab=exercises|body|workouts` abre directamente esa pestaña; `?theme=dark|light` fuerza el tema.
+- `?tab=overview|workouts|routines|exercises|body|nutrition` abre directamente esa vista; `?theme=dark|light` fuerza el tema.
 
 Para generar la versión estática (carpeta `dist/`, se puede servir desde cualquier sitio):
 
@@ -32,7 +32,12 @@ npm run build
 | `src/data.ts` | Leer/validar el JSON, recordarlo en el navegador y los datos de ejemplo |
 | `src/stats.ts` | Cálculos: volumen, series efectivas, 1RM (Brzycki ≤ 12 reps), récords, rachas |
 | `src/charts/` | Gráficos en SVG propio (líneas, columnas, barras, calendario) con tooltip y teclado |
-| `src/views/` | Pestañas: Resumen, Ejercicios, Cuerpo, Entrenos |
+| `src/views/` | Vistas: Resumen, Entrenos, Rutinas, Ejercicios y Cuerpo (Estadísticas), Nutrición |
+| `src/ui.tsx` | Componentes compartidos: tarjetas, cifras, etiquetas, estados vacíos, esqueletos de carga, anillo de progreso |
+| `src/icons.tsx` | Iconos SVG propios (sin dependencias) |
+| `src/theme.ts`, `public/theme-init.js` | Tema claro/oscuro |
+| `src/navigation.ts` | Secciones, pestañas y lectura de `?tab=` |
+| `tests/` | Pruebas sin dependencias (`npm test`, ejecutor de Node): tema y navegación |
 
 Reglas de cálculo (las mismas que la app): las series de calentamiento no cuentan para volumen,
 series ni récords; el 1RM estimado solo usa series de 1 a 12 repeticiones.
@@ -48,3 +53,16 @@ de los últimos 30 días y edición de objetivos. A diferencia del resto del pan
 **escribe** en el servidor (`/api/nutrition/*`): PostgreSQL es la fuente de verdad y el
 navegador no guarda nada. Cada registro lleva un UUID generado aquí, así que un reintento
 no crea duplicados. `?tab=nutrition` abre directamente esta pestaña.
+
+## Diseño
+
+- **Navegación:** barra lateral en el ordenador (≥ 860 px) y barra inferior en el móvil con las cinco
+  secciones: Resumen, Entrenamientos, Rutinas, Estadísticas (Ejercicios y Cuerpo) y Nutrición.
+  Los enlaces `?tab=` de antes siguen valiendo.
+- **Temas:** claro por defecto; el oscuro se elige con el botón de sol/luna y se recuerda en este
+  navegador (`localStorage`, clave `gymflow-panel:theme`). No se sigue el tema del sistema.
+  `public/theme-init.js` aplica el tema antes de pintar para evitar destellos; es un archivo aparte
+  porque la CSP del servidor (`script-src 'self'`) no permite scripts en línea.
+- **Colores** (variables en `src/index.css`): azul `#3978E8` y turquesa `#19A7A0` como acentos;
+  proteínas en azul, carbohidratos en turquesa y grasas en ámbar en todas las vistas de nutrición.
+- **Rutinas:** muestra las rutinas que ya trae la exportación (`routines`); solo lectura.

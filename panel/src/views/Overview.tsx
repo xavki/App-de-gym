@@ -1,13 +1,25 @@
+import type { Tab } from '../navigation'
 import { BarList } from '../charts/BarList'
 import { CalendarHeatmap } from '../charts/CalendarHeatmap'
 import { ColumnChart } from '../charts/ColumnChart'
+import { Icon, type IconName } from '../icons'
 import {
   dayKey, fmtDate, fmtDuration, fmtInt, fmtVolume, longestStreak, muscleGroupSets, perDay, volumeBuckets,
   type Workout,
 } from '../stats'
-import { ChartCard, StatTile } from '../ui'
+import { ChartCard, EmptyState, StatTile } from '../ui'
 
-export function Overview({ workouts, range }: { workouts: Workout[]; range: [Date, Date] }) {
+const fmtRange = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', year: 'numeric' })
+const fmtDayNum = new Intl.DateTimeFormat('es', { day: 'numeric' })
+const fmtMonth = new Intl.DateTimeFormat('es', { month: 'short' })
+
+export function Overview({ workouts, range, routines, nutrition, onNavigate }: {
+  workouts: Workout[]
+  range: [Date, Date]
+  routines: number
+  nutrition: boolean
+  onNavigate: (tab: Tab) => void
+}) {
   const volume = workouts.reduce((a, w) => a + w.volume, 0)
   const sets = workouts.reduce((a, w) => a + w.workSets, 0)
   const time = workouts.reduce((a, w) => a + w.durationSeconds, 0)
@@ -15,25 +27,52 @@ export function Overview({ workouts, range }: { workouts: Workout[]; range: [Dat
   const weeks = Math.max(1, (range[1].getTime() - range[0].getTime()) / (7 * 86_400_000))
   const { unit, buckets } = volumeBuckets(workouts, range)
   const groups = muscleGroupSets(workouts)
-  const fmtRange = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', year: 'numeric' })
+  const last = workouts.at(-1)
+
+  const links: { tab: Tab; icon: IconName; title: string; text: string; tone: string }[] = [
+    { tab: 'workouts', icon: 'dumbbell', title: 'Entrenamientos', text: `${fmtInt(workouts.length)} en el rango`, tone: 'blue' },
+    { tab: 'routines', icon: 'clipboard', title: 'Rutinas', text: routines === 1 ? '1 rutina' : `${fmtInt(routines)} rutinas`, tone: 'violet' },
+    { tab: 'exercises', icon: 'chart', title: 'Estadísticas', text: 'Progresión y récords', tone: 'teal' },
+    ...(nutrition ? [{ tab: 'nutrition' as Tab, icon: 'apple' as IconName, title: 'Nutrición', text: 'Comidas y macros del día', tone: 'amber' }] : []),
+  ]
 
   return (
     <>
-      <div className="hero">
-        <div className="hero-label">Volumen total · {fmtRange.format(range[0])} – {fmtRange.format(range[1])}</div>
-        <div className="hero-value">{fmtVolume(volume)}</div>
-      </div>
+      <section className="hero-card">
+        <div className="hero-main">
+          <div className="hero-label">Volumen total · {fmtRange.format(range[0])} – {fmtRange.format(range[1])}</div>
+          <div className="hero-value">{fmtVolume(volume)}</div>
+          <div className="hero-sub">
+            {last
+              ? <>Último entreno: <strong>{last.name || 'Entreno'}</strong> · {fmtDate(last.date)}</>
+              : 'Sin entrenamientos en este rango'}
+          </div>
+        </div>
+        <div className="hero-side" aria-hidden>
+          <Icon name="flame" size={56} />
+        </div>
+      </section>
 
       <div className="stats">
-        <StatTile label="Entrenamientos" value={fmtInt(workouts.length)} hint={`${(workouts.length / weeks).toFixed(1).replace('.', ',')} por semana`} />
-        <StatTile label="Series efectivas" value={fmtInt(sets)} hint="Sin calentamientos" />
-        <StatTile label="Tiempo entrenando" value={fmtDuration(time)} hint={workouts.length ? `${fmtDuration(time / workouts.length)} de media` : undefined} />
-        <StatTile label="Racha más larga" value={`${longestStreak(workouts)} días`} hint="Días seguidos" />
+        <StatTile icon="dumbbell" tone="blue" label="Entrenamientos" value={fmtInt(workouts.length)} hint={`${(workouts.length / weeks).toFixed(1).replace('.', ',')} por semana`} />
+        <StatTile icon="layers" tone="teal" label="Series efectivas" value={fmtInt(sets)} hint="Sin calentamientos" />
+        <StatTile icon="clock" tone="violet" label="Tiempo entrenando" value={fmtDuration(time)} hint={workouts.length ? `${fmtDuration(time / workouts.length)} de media` : undefined} />
+        <StatTile icon="flame" tone="amber" label="Racha más larga" value={`${longestStreak(workouts)} días`} hint="Días seguidos" />
       </div>
+
+      <nav className="quick-links" aria-label="Accesos rápidos">
+        {links.map((l) => (
+          <button key={l.tab} className="quick-link" onClick={() => onNavigate(l.tab)}>
+            <span className={`ql-icon tone-${l.tone}`}><Icon name={l.icon} /></span>
+            <span className="ql-text"><strong>{l.title}</strong><span className="muted small">{l.text}</span></span>
+            <Icon name="chevronRight" size={18} className="ql-chev" />
+          </button>
+        ))}
+      </nav>
 
       <div className="grid">
         <ChartCard
-          wide
+          wide icon="chart"
           title={unit === 'week' ? 'Volumen por semana' : 'Volumen por mes'}
           subtitle="Peso × repeticiones de las series efectivas"
           table={{
@@ -56,7 +95,7 @@ export function Overview({ workouts, range }: { workouts: Workout[]; range: [Dat
         </ChartCard>
 
         <ChartCard
-          wide
+          wide icon="calendar"
           title="Calendario"
           subtitle="Cada casilla es un día; cuanto más intenso el color, más volumen"
           table={{
@@ -69,6 +108,7 @@ export function Overview({ workouts, range }: { workouts: Workout[]; range: [Dat
         </ChartCard>
 
         <ChartCard
+          icon="target"
           title="Series por grupo muscular"
           subtitle="Series efectivas en el rango"
           table={{ columns: ['Grupo', 'Series'], rows: groups.map((g) => [g.label, g.value]), numeric: [false, true] }}
@@ -76,19 +116,23 @@ export function Overview({ workouts, range }: { workouts: Workout[]; range: [Dat
           <BarList data={groups} format={fmtInt} />
         </ChartCard>
 
-        <ChartCard title="Últimos entrenamientos">
-          <ul className="recent">
-            {[...workouts].reverse().slice(0, 6).map((w) => (
-              <li key={w.id}>
-                <div>
-                  <strong>{w.name || 'Entreno'}</strong>
-                  <span className="muted"> · {fmtDate(w.date)}</span>
-                </div>
-                <div className="muted small">{fmtVolume(w.volume)} · {w.workSets} series · {fmtDuration(w.durationSeconds)}</div>
-              </li>
-            ))}
-            {!workouts.length && <li className="muted">Sin entrenamientos en este rango</li>}
-          </ul>
+        <ChartCard icon="history" title="Actividad reciente" subtitle="Últimos entrenamientos del rango">
+          {workouts.length ? (
+            <ul className="recent">
+              {[...workouts].reverse().slice(0, 6).map((w) => (
+                <li key={w.id}>
+                  <button className="recent-item" onClick={() => onNavigate('workouts')}>
+                    <span className="date-chip"><strong>{fmtDayNum.format(w.date)}</strong><span>{fmtMonth.format(w.date)}</span></span>
+                    <span className="recent-text">
+                      <strong>{w.name || 'Entreno'}</strong>
+                      <span className="muted small">{fmtVolume(w.volume)} · {w.workSets} series · {fmtDuration(w.durationSeconds)}</span>
+                    </span>
+                    <Icon name="chevronRight" size={18} className="ql-chev" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : <EmptyState icon="dumbbell" title="Sin entrenamientos en este rango">Prueba con un rango más largo.</EmptyState>}
         </ChartCard>
       </div>
       <p className="footnote">Calendario: {days.size} días entrenados de {Math.round((range[1].getTime() - range[0].getTime()) / 86_400_000) + 1}. Último: {workouts.length ? dayKey(workouts.at(-1)!.date) : '—'}.</p>

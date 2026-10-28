@@ -154,9 +154,25 @@ export function sampleExport(): GymExport {
     })
   }
 
+  // Las mismas tres rutinas, con el peso objetivo de la última semana (después del bucle: no altera los entrenos)
+  const weeksTotal = (end.getTime() - start.getTime()) / (7 * 86_400_000)
+  const routines: GymExport['routines'] = order.map((name) => ({
+    id: uuid(), name, updatedAt: end.toISOString(),
+    exercises: plans[name].map(([ex, group, base, perWeek], p) => ({
+      id: uuid(), exerciseId: null, name: ex, mainGroup: group, position: p, notes: '',
+      sets: [
+        ...(base >= 60 ? [{ position: 0, type: 'WARMUP', targetWeightKg: Math.round((base + perWeek * weeksTotal) * 0.5 / 2.5) * 2.5, targetReps: 8, targetTimeSeconds: 0 }] : []),
+        ...[0, 1, 2].map((s) => ({
+          position: (base >= 60 ? 1 : 0) + s, type: 'NORMAL',
+          targetWeightKg: Math.round((base + perWeek * weeksTotal) / 2.5) * 2.5, targetReps: base === 0 ? 8 : 8 - s, targetTimeSeconds: 0,
+        })),
+      ],
+    })),
+  }))
+
   return {
     schemaVersion: 1, exportedAt: end.toISOString(), userId: 'demo',
     units: { weight: 'kg', length: 'cm', time: 's' },
-    workouts, routines: [], bodyMeasurements, customExercises: [], achievements: [],
+    workouts, routines, bodyMeasurements, customExercises: [], achievements: [],
   }
 }

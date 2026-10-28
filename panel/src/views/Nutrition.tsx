@@ -5,11 +5,15 @@ import {
   parseDay, saveGoals, sumMacros, updateLog, type CustomFood, type DaySummary, type Goals, type Meal, type NutritionLog,
 } from '../nutrition'
 import { fmtInt, fmtNum } from '../stats'
+import { Icon, type IconName } from '../icons'
+import { Badge, EmptyState, ProgressRing, Skeleton } from '../ui'
 
 const SERVING_STEP = 0.25
 const fmtDay = (s: string) => new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' }).format(parseDay(s))
 const fmtDayShort = (s: string) => new Intl.DateTimeFormat('es', { weekday: 'short', day: 'numeric', month: 'short' }).format(parseDay(s))
-const fmtServings = (n: number) => (n === 1 ? '1 ración' : `${fmtNum(n)} raciones`)
+/** Raciones con hasta 2 decimales: el paso es 0,25 y fmtNum (1 decimal) mostraría 1,25 como «1,3». */
+const fmtQty = (n: number) => new Intl.NumberFormat('es', { maximumFractionDigits: 2 }).format(n)
+const fmtServings = (n: number) => (n === 1 ? '1 ración' : `${fmtQty(n)} raciones`)
 
 interface Toast { text: string; undo?: () => void }
 
@@ -146,96 +150,135 @@ export function Nutrition({ token, onUnauthorized }: { token: string; onUnauthor
   const shownGoals = dayGoals ?? goals
 
   if (!meals || !goals || !shownGoals) {
-    return error ? <div className="error" role="alert">{error}</div> : <div className="empty big" aria-busy="true">Cargando nutrición…</div>
+    return error ? <div className="error" role="alert">{error}</div> : <Skeleton rows={3} label="Cargando nutrición" />
   }
+
+  const kcalPct = shownGoals.kcal > 0 ? (consumed.kcal / shownGoals.kcal) * 100 : 0
+  const kcalLeft = shownGoals.kcal - consumed.kcal
 
   return (
     <div className="nutrition">
       {error && <div className="error" role="alert">{error}</div>}
 
-      <div className="day-picker" role="group" aria-label="Día">
-        <button className="btn ghost icon" onClick={() => setDate(addDays(date, -1))} aria-label="Día anterior">‹</button>
+      <div className="day-picker card" role="group" aria-label="Día">
+        <button className="icon-btn soft" onClick={() => setDate(addDays(date, -1))} aria-label="Día anterior"><Icon name="chevronLeft" /></button>
         <label className="day-label">
           <span className="day-name">{date === today ? 'Hoy' : fmtDay(date)}</span>
           <input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Elegir fecha" />
         </label>
-        <button className="btn ghost icon" onClick={() => setDate(addDays(date, 1))} disabled={date >= today} aria-label="Día siguiente">›</button>
-        {date !== today && <button className="btn ghost" onClick={() => setDate(today)}>Hoy</button>}
+        <button className="icon-btn soft" onClick={() => setDate(addDays(date, 1))} disabled={date >= today} aria-label="Día siguiente"><Icon name="chevronRight" /></button>
+        {date !== today && <button className="btn ghost today-btn" onClick={() => setDate(today)}>Hoy</button>}
       </div>
 
-      <section className="card" aria-labelledby="sum-title">
+      <section className="card summary-card" aria-labelledby="sum-title">
         <header className="card-head">
-          <div>
-            <h2 id="sum-title">{date === today ? 'Resumen de hoy' : `Resumen del ${fmtDayShort(date)}`}</h2>
-            <p className="subtitle">
-              {logs ? `${logs.length} ${logs.length === 1 ? 'comida registrada' : 'comidas registradas'}` : 'Cargando…'}
-              {date !== today && dayGoals && ' · objetivos vigentes ese día'}
-            </p>
+          <div className="card-title">
+            <span className="card-icon"><Icon name="target" size={18} /></span>
+            <div>
+              <h2 id="sum-title">{date === today ? 'Resumen de hoy' : `Resumen del ${fmtDayShort(date)}`}</h2>
+              <p className="subtitle">
+                {logs ? `${logs.length} ${logs.length === 1 ? 'comida registrada' : 'comidas registradas'}` : 'Cargando…'}
+                {date !== today && dayGoals && ' · objetivos vigentes ese día'}
+              </p>
+            </div>
           </div>
         </header>
-        <div className="macro-bars">
-          <MacroBar label="Calorías" unit="kcal" value={consumed.kcal} goal={shownGoals.kcal} big />
-          <MacroBar label="Proteínas" unit="g" value={consumed.proteinG} goal={shownGoals.proteinG} />
-          <MacroBar label="Grasas" unit="g" value={consumed.fatG} goal={shownGoals.fatG} />
-          <MacroBar label="Carbohidratos" unit="g" value={consumed.carbsG} goal={shownGoals.carbsG} />
+        <div className="summary-body">
+          <ProgressRing pct={kcalPct} over={kcalLeft < 0}
+            label={`Calorías: ${fmtInt(consumed.kcal)} de ${fmtInt(shownGoals.kcal)} kcal (${fmtInt(kcalPct)} %)`}>
+            <span className="pring-value-text">{fmtInt(consumed.kcal)}</span>
+            <span className="pring-goal">de {fmtInt(shownGoals.kcal)} kcal</span>
+            <span className={`pring-left${kcalLeft < 0 ? ' over' : ''}`}>
+              {kcalLeft < 0 ? `+${fmtInt(-kcalLeft)} kcal de más` : `Quedan ${fmtInt(kcalLeft)} kcal`} · {fmtInt(kcalPct)} %
+            </span>
+          </ProgressRing>
+          <div className="macro-bars">
+            <MacroBar label="Proteínas" tone="protein" unit="g" value={consumed.proteinG} goal={shownGoals.proteinG} />
+            <MacroBar label="Carbohidratos" tone="carbs" unit="g" value={consumed.carbsG} goal={shownGoals.carbsG} />
+            <MacroBar label="Grasas" tone="fat" unit="g" value={consumed.fatG} goal={shownGoals.fatG} />
+          </div>
         </div>
       </section>
 
-      {CATEGORIES.map((cat) => (
-        <section key={cat.key} className="meal-group" aria-labelledby={`cat-${cat.key}`}>
-          <h2 id={`cat-${cat.key}`} className="section-title">{cat.label}</h2>
-          <div className="meal-grid">
-            {meals.filter((m) => m.category === cat.key).map((meal) => (
-              <MealCard
-                key={meal.code} meal={meal} planned={meal.planDays.includes(weekday)}
-                logged={byMeal.get(meal.code) ?? []} busy={busy.has(meal.code)} loading={!logs}
-                onAdd={() => add(meal)}
-                onUndo={(log) => remove(log)}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
-
-      <CustomMealForm busy={busy.has('custom')} disabled={!logs} onAdd={addCustom} />
-
-      <section className="card" aria-labelledby="day-logs">
-        <header className="card-head">
-          <div>
-            <h2 id="day-logs">Registrado {date === today ? 'hoy' : `el ${fmtDayShort(date)}`}</h2>
-            <p className="subtitle">Ajusta las raciones o elimina lo que no hayas comido</p>
-          </div>
-        </header>
-        {!logs ? <div className="empty">Cargando…</div> : logs.length === 0 ? <div className="empty">Nada registrado este día.</div> : (
-          <ul className="log-list">
-            {logs.map((log) => (
-              <li key={log.id} className={busy.has(log.id) ? 'pending' : undefined}>
-                <div className="log-main">
-                  <span className={log.mealCode ? 'code-badge' : 'code-badge custom'}>{log.mealCode ?? 'Otra'}</span>
-                  <span className="log-name">{log.mealName}</span>
+      <div className="nutri-layout">
+        <div className="nutri-main">
+          {CATEGORIES.map((cat) => {
+            const list = meals.filter((m) => m.category === cat.key)
+            // Las del plan de ese día primero (orden estable: el resto mantiene el del catálogo)
+            const sorted = [...list].sort((a, b) => Number(b.planDays.includes(weekday)) - Number(a.planDays.includes(weekday)))
+            const doneCount = list.filter((m) => byMeal.has(m.code)).length
+            return (
+              <section key={cat.key} className="meal-group" aria-labelledby={`cat-${cat.key}`}>
+                <header className="meal-group-head">
+                  <span className={`cat-icon cat-${cat.key.toLowerCase()}`}><Icon name={CATEGORY_ICON[cat.key]} /></span>
+                  <h2 id={`cat-${cat.key}`}>{cat.label}</h2>
+                  {doneCount > 0 && <Badge tone="teal" icon="check">{doneCount} registrada{doneCount > 1 ? 's' : ''}</Badge>}
+                </header>
+                <div className="meal-grid">
+                  {sorted.map((meal) => (
+                    <MealCard
+                      key={meal.code} meal={meal} planned={meal.planDays.includes(weekday)}
+                      logged={byMeal.get(meal.code) ?? []} busy={busy.has(meal.code)} loading={!logs}
+                      onAdd={() => add(meal)}
+                      onUndo={(log) => remove(log)}
+                    />
+                  ))}
                 </div>
-                <div className="log-actions">
-                  <div className="stepper" role="group" aria-label={`Raciones de ${logLabel(log)}`}>
-                    <button onClick={() => changeServings(log, log.servings - SERVING_STEP)} disabled={log.servings <= SERVING_STEP || busy.has(log.id)} aria-label="Menos">−</button>
-                    <span aria-live="polite">{fmtNum(log.servings)}×</span>
-                    <button onClick={() => changeServings(log, log.servings + SERVING_STEP)} disabled={log.servings >= 10 || busy.has(log.id)} aria-label="Más">+</button>
-                  </div>
-                  <span className="log-kcal">{fmtInt(log.total.kcal)} kcal</span>
-                  <button className="btn ghost danger" onClick={() => remove(log)} disabled={busy.has(log.id)}>Eliminar</button>
+              </section>
+            )
+          })}
+        </div>
+
+        <aside className="nutri-side">
+          <section className="card" aria-labelledby="day-logs">
+            <header className="card-head">
+              <div className="card-title">
+                <span className="card-icon"><Icon name="check" size={18} /></span>
+                <div>
+                  <h2 id="day-logs">Registrado {date === today ? 'hoy' : `el ${fmtDayShort(date)}`}</h2>
+                  <p className="subtitle">Ajusta las raciones o elimina lo que no hayas comido</p>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+              </div>
+            </header>
+            {!logs ? <div className="skeleton skeleton-block small" aria-busy="true" /> : logs.length === 0 ? (
+              <EmptyState icon="bowl" title="Nada registrado este día">Marca una comida del plan o añade otra.</EmptyState>
+            ) : (
+              <ul className="log-list">
+                {logs.map((log) => (
+                  <li key={log.id} className={busy.has(log.id) ? 'pending' : undefined}>
+                    <div className="log-main">
+                      <span className={log.mealCode ? 'code-badge' : 'code-badge custom'}>{log.mealCode ?? 'Otra'}</span>
+                      <span className="log-name">{log.mealName}</span>
+                      {!log.mealCode && <Badge tone="amber">Personalizada</Badge>}
+                    </div>
+                    <div className="log-actions">
+                      <div className="stepper" role="group" aria-label={`Raciones de ${logLabel(log)}`}>
+                        <button onClick={() => changeServings(log, log.servings - SERVING_STEP)} disabled={log.servings <= SERVING_STEP || busy.has(log.id)} aria-label="Menos"><Icon name="minus" size={16} /></button>
+                        <span aria-live="polite">{fmtQty(log.servings)}×</span>
+                        <button onClick={() => changeServings(log, log.servings + SERVING_STEP)} disabled={log.servings >= 10 || busy.has(log.id)} aria-label="Más"><Icon name="plus" size={16} /></button>
+                      </div>
+                      <span className="log-kcal"><strong>{fmtInt(log.total.kcal)}</strong> kcal</span>
+                      <button className="icon-btn danger" onClick={() => remove(log)} disabled={busy.has(log.id)} aria-label={`Eliminar ${logLabel(log)}`} title="Eliminar">
+                        <Icon name="trash" size={18} />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
-      <History days={days} selected={date} onSelect={setDate} />
+          <CustomMealForm busy={busy.has('custom')} disabled={!logs} onAdd={addCustom} />
 
-      <GoalsForm key={JSON.stringify(goals)} goals={goals} isDefault={goalsAreDefault} onSave={storeGoals} />
+          <History days={days} selected={date} onSelect={setDate} />
+
+          <GoalsForm key={JSON.stringify(goals)} goals={goals} isDefault={goalsAreDefault} onSave={storeGoals} />
+        </aside>
+      </div>
 
       {toast && (
         <div className="toast" role="status">
-          <span>✓ {toast.text}</span>
+          <span className="toast-text"><Icon name="check" size={18} /> {toast.text}</span>
           {toast.undo && <button className="link-btn" onClick={toast.undo}>Deshacer</button>}
         </div>
       )}
@@ -243,14 +286,16 @@ export function Nutrition({ token, onUnauthorized }: { token: string; onUnauthor
   )
 }
 
-function MacroBar({ label, unit, value, goal, big = false }: { label: string; unit: string; value: number; goal: number; big?: boolean }) {
+const CATEGORY_ICON: Record<string, IconName> = { BREAKFAST: 'sunrise', LUNCH: 'bowl', SNACK: 'cup', DINNER: 'moon' }
+
+function MacroBar({ label, tone, unit, value, goal }: { label: string; tone: string; unit: string; value: number; goal: number }) {
   const pct = goal > 0 ? (value / goal) * 100 : 0
   const over = value - goal
   const fmt = unit === 'kcal' ? fmtInt : fmtNum
   return (
-    <div className={`macro${big ? ' big' : ''}${over > 0 ? ' over' : ''}`}>
+    <div className={`macro tone-${tone}${over > 0 ? ' over' : ''}`}>
       <div className="macro-head">
-        <span className="macro-label">{label}</span>
+        <span className="macro-label"><span className="dot" />{label}</span>
         <span className="macro-value"><strong>{fmt(value)}</strong> / {fmt(goal)} {unit}</span>
       </div>
       <div className="bar" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={goal} aria-valuenow={value}
@@ -271,23 +316,26 @@ function MealCard({ meal, planned, logged, busy, loading, onAdd, onUndo }: {
   const done = logged.length > 0
   const servings = logged.reduce((a, l) => a + l.servings, 0)
   const m = meal.perServing
+  const state = done ? 'done' : planned ? 'planned' : 'idle'
   return (
-    <article className={`meal-card${done ? ' done' : ''}`}>
+    <article className={`meal-card ${state}`}>
       <header className="meal-head">
         <span className="code-badge">{meal.code}</span>
-        <h3>{meal.name}</h3>
-        {planned && <span className="plan-badge" title="Lo propone el menú semanal para este día">Plan del día</span>}
+        {planned && <Badge tone="blue" icon="sparkle" title="Lo propone el menú semanal para este día">Plan del día</Badge>}
+        {done ? <Badge tone="teal" icon="check">Registrada</Badge> : planned && <Badge tone="amber">Pendiente</Badge>}
       </header>
+      <h3>{meal.name}</h3>
       <p className="ingredients">{meal.ingredients}</p>
       <dl className="meal-macros">
-        <div><dt>kcal</dt><dd>{fmtInt(m.kcal)}</dd></div>
-        <div><dt>Prot.</dt><dd>{fmtNum(m.proteinG)} g</dd></div>
-        <div><dt>Grasa</dt><dd>{fmtNum(m.fatG)} g</dd></div>
-        <div><dt>Carb.</dt><dd>{fmtNum(m.carbsG)} g</dd></div>
+        <div className="mm-kcal"><dt>kcal</dt><dd>{fmtInt(m.kcal)}</dd></div>
+        <div className="mm-protein"><dt>Prot.</dt><dd>{fmtNum(m.proteinG)} g</dd></div>
+        <div className="mm-carbs"><dt>Carb.</dt><dd>{fmtNum(m.carbsG)} g</dd></div>
+        <div className="mm-fat"><dt>Grasa</dt><dd>{fmtNum(m.fatG)} g</dd></div>
       </dl>
-      {done && <p className="meal-status" aria-live="polite">✓ Registrada · {fmtServings(servings)}</p>}
+      {done && <p className="meal-status" aria-live="polite"><Icon name="check" size={16} /> Registrada · {fmtServings(servings)}</p>}
       <div className="meal-actions">
         <button className={done ? 'btn ghost big-btn' : 'btn big-btn'} onClick={onAdd} disabled={busy || loading} aria-busy={busy}>
+          {!busy && <Icon name={done ? 'plus' : 'check'} size={18} />}
           {busy ? 'Guardando…' : done ? 'Registrar otra vez' : 'Marcar como realizada'}
         </button>
         {done && (
@@ -302,32 +350,38 @@ function History({ days, selected, onSelect }: { days: DaySummary[]; selected: s
   return (
     <section className="card" aria-labelledby="hist-title">
       <header className="card-head">
-        <div>
-          <h2 id="hist-title">Historial</h2>
-          <p className="subtitle">Últimos 30 días con registros · pulsa un día para verlo o corregirlo</p>
+        <div className="card-title">
+          <span className="card-icon"><Icon name="history" size={18} /></span>
+          <div>
+            <h2 id="hist-title">Historial</h2>
+            <p className="subtitle">Últimos 30 días con registros · pulsa un día para verlo o corregirlo</p>
+          </div>
         </div>
       </header>
-      {days.length === 0 ? <div className="empty">Aún no hay días registrados.</div> : (
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr><th>Día</th><th className="num">kcal</th><th className="num">Prot.</th><th className="num">Grasa</th><th className="num">Carb.</th></tr>
-            </thead>
-            <tbody>
-              {days.map((d) => (
-                <tr key={d.date} className={`clickable${d.date === selected ? ' selected' : ''}`} onClick={() => onSelect(d.date)}
-                  tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(d.date) } }}
+      {days.length === 0 ? <EmptyState icon="calendar" title="Aún no hay días registrados" /> : (
+        <ul className="history-list">
+          {days.map((d) => {
+            const pct = d.goals.kcal > 0 ? (d.consumed.kcal / d.goals.kcal) * 100 : 0
+            const over = d.consumed.kcal > d.goals.kcal
+            return (
+              <li key={d.date}>
+                <button className={`history-item${d.date === selected ? ' selected' : ''}`} onClick={() => onSelect(d.date)}
                   aria-current={d.date === selected ? 'date' : undefined}>
-                  <td>{fmtDayShort(d.date)}</td>
-                  <td className={`num${d.consumed.kcal > d.goals.kcal ? ' over-text' : ''}`}>{fmtInt(d.consumed.kcal)} / {fmtInt(d.goals.kcal)}</td>
-                  <td className="num">{fmtNum(d.consumed.proteinG)} g</td>
-                  <td className="num">{fmtNum(d.consumed.fatG)} g</td>
-                  <td className="num">{fmtNum(d.consumed.carbsG)} g</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  <span className="hi-top">
+                    <span className="hi-day">{fmtDayShort(d.date)}</span>
+                    <span className={`hi-kcal${over ? ' over-text' : ''}`}><strong>{fmtInt(d.consumed.kcal)}</strong> / {fmtInt(d.goals.kcal)} kcal</span>
+                  </span>
+                  <span className={`mini-bar${over ? ' over' : ''}`}><span style={{ width: `${Math.min(pct, 100)}%` }} /></span>
+                  <span className="hi-macros">
+                    <span><span className="dot protein" />P {fmtNum(d.consumed.proteinG)} g</span>
+                    <span><span className="dot carbs" />C {fmtNum(d.consumed.carbsG)} g</span>
+                    <span><span className="dot fat" />G {fmtNum(d.consumed.fatG)} g</span>
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
       )}
     </section>
   )
@@ -353,7 +407,7 @@ function GoalsForm({ goals, isDefault, onSave }: { goals: Goals; isDefault: bool
 
   return (
     <details className="card goals-card">
-      <summary><h2>Objetivos diarios</h2><span className="subtitle">{isDefault ? 'Valores iniciales del plan' : 'Personalizados'}</span></summary>
+      <summary><span className="card-icon"><Icon name="target" size={18} /></span><h2>Objetivos diarios</h2><span className="subtitle">{isDefault ? 'Valores iniciales del plan' : 'Personalizados'}</span><Icon name="chevronDown" size={18} className="summary-chev" /></summary>
       <form className="goals-form" onSubmit={async (e) => {
         e.preventDefault()
         if (!valid) return
@@ -406,7 +460,7 @@ function CustomMealForm({ busy, disabled, onAdd }: { busy: boolean; disabled: bo
 
   return (
     <details className="card goals-card">
-      <summary><h2>Otra comida</h2><span className="subtitle">Algo fuera del plan, con sus valores</span></summary>
+      <summary><span className="card-icon tone-amber"><Icon name="plus" size={18} /></span><h2>Otra comida</h2><span className="subtitle">Algo fuera del plan, con sus valores</span><Icon name="chevronDown" size={18} className="summary-chev" /></summary>
       <form className="goals-form" onSubmit={async (e) => {
         e.preventDefault()
         if (!valid || busy) return

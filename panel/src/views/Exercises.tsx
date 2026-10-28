@@ -6,7 +6,7 @@ import {
   type Workout,
 } from '../stats'
 import type { ExportSet } from '../types'
-import { ChartCard, DataTable, StatTile } from '../ui'
+import { ChartCard, DataTable, EmptyState, StatTile } from '../ui'
 
 const setText = (s: ExportSet) =>
   (s.weightKg > 0 ? `${fmtNum(s.weightKg)}×${s.reps}` : `${s.reps} reps`) + (s.rpe != null ? ` @${fmtNum(s.rpe)}` : '') +
@@ -26,7 +26,7 @@ export function Exercises({ all, range }: { all: Workout[]; range: [Date, Date] 
   const hasWeight = allSessions.some((s) => s.topWeight > 0)
   const filtered = index.filter((e) => e.name.toLowerCase().includes(query.toLowerCase()))
 
-  if (!index.length) return <div className="empty big">Sin ejercicios en este rango</div>
+  if (!index.length) return <EmptyState icon="chart" title="Sin ejercicios en este rango">Prueba con un rango más largo.</EmptyState>
 
   return (
     <div className="split">
@@ -55,15 +55,15 @@ export function Exercises({ all, range }: { all: Workout[]; range: [Date, Date] 
           <h2 className="section-title">{selected}</h2>
           {hasWeight && (
             <div className="stats">
-              <StatTile label="1RM estimado" value={rec.bestE1rm ? fmtKg(rec.bestE1rm.value) : '—'} hint={rec.bestE1rm && `${fmtNum(rec.bestE1rm.weight)}×${rec.bestE1rm.reps} · ${fmtDateShort(rec.bestE1rm.date)}`} />
-              <StatTile label="Peso máximo" value={rec.topWeight ? fmtKg(rec.topWeight.value) : '—'} hint={rec.topWeight && `×${rec.topWeight.reps} · ${fmtDateShort(rec.topWeight.date)}`} />
-              <StatTile label="Mejor serie (volumen)" value={rec.bestSetVolume ? fmtVolume(rec.bestSetVolume.value) : '—'} hint={rec.bestSetVolume && `${fmtNum(rec.bestSetVolume.weight)}×${rec.bestSetVolume.reps}`} />
-              <StatTile label="Mejor sesión" value={rec.bestSessionVolume ? fmtVolume(rec.bestSessionVolume.value) : '—'} hint={rec.bestSessionVolume && fmtDateShort(rec.bestSessionVolume.date)} />
+              <StatTile icon="trophy" tone="amber" label="1RM estimado" value={rec.bestE1rm ? fmtKg(rec.bestE1rm.value) : '—'} hint={rec.bestE1rm && `${fmtNum(rec.bestE1rm.weight)}×${rec.bestE1rm.reps} · ${fmtDateShort(rec.bestE1rm.date)}`} />
+              <StatTile icon="dumbbell" tone="blue" label="Peso máximo" value={rec.topWeight ? fmtKg(rec.topWeight.value) : '—'} hint={rec.topWeight && `×${rec.topWeight.reps} · ${fmtDateShort(rec.topWeight.date)}`} />
+              <StatTile icon="layers" tone="teal" label="Mejor serie (volumen)" value={rec.bestSetVolume ? fmtVolume(rec.bestSetVolume.value) : '—'} hint={rec.bestSetVolume && `${fmtNum(rec.bestSetVolume.weight)}×${rec.bestSetVolume.reps}`} />
+              <StatTile icon="flame" tone="violet" label="Mejor sesión" value={rec.bestSessionVolume ? fmtVolume(rec.bestSessionVolume.value) : '—'} hint={rec.bestSessionVolume && fmtDateShort(rec.bestSessionVolume.date)} />
             </div>
           )}
           {!hasWeight && rec.maxReps && (
             <div className="stats">
-              <StatTile label="Máximo de repeticiones" value={`${rec.maxReps.value}`} hint={fmtDateShort(rec.maxReps.date)} />
+              <StatTile icon="trophy" tone="amber" label="Máximo de repeticiones" value={`${rec.maxReps.value}`} hint={fmtDateShort(rec.maxReps.date)} />
             </div>
           )}
           <p className="footnote">Los récords son de todo el historial; los gráficos, del rango elegido.</p>
@@ -71,7 +71,7 @@ export function Exercises({ all, range }: { all: Workout[]; range: [Date, Date] 
           <div className="grid">
             {hasWeight && (
               <ChartCard
-                wide
+                wide icon="chart"
                 title="Progresión de fuerza"
                 subtitle="1RM estimado (Brzycki, series de hasta 12 reps) y peso máximo por sesión"
                 table={{
@@ -90,7 +90,7 @@ export function Exercises({ all, range }: { all: Workout[]; range: [Date, Date] 
               </ChartCard>
             )}
 
-            <ChartCard wide title={hasWeight ? 'Volumen por sesión' : 'Repeticiones por sesión'}>
+            <ChartCard wide icon="layers" title={hasWeight ? 'Volumen por sesión' : 'Repeticiones por sesión'}>
               <ColumnChart
                 data={sessions.map((s) => {
                   const v = hasWeight ? s.volume : s.sets.reduce((a, st) => a + st.reps, 0)
@@ -104,7 +104,7 @@ export function Exercises({ all, range }: { all: Workout[]; range: [Date, Date] 
               />
             </ChartCard>
 
-            <ChartCard wide title="Historial">
+            <ChartCard wide icon="history" title="Historial">
               <DataTable
                 columns={['Fecha', 'Series', hasWeight ? '1RM est.' : 'Reps', hasWeight ? 'Volumen' : '']}
                 numeric={[false, false, true, true]}
