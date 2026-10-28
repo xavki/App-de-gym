@@ -80,7 +80,7 @@ fun CalendarScreen(
             )
 
             Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = TextPrimary.copy(alpha = 0.08f))
             Spacer(Modifier.height(12.dp))
 
             // ── Título del día ────────────────────────────────────────────────
@@ -141,7 +141,7 @@ fun CalendarScreen(
         FloatingActionButton(
             onClick        = { preselectedRoutine = null; showDialog = true },
             containerColor = AccentCyan,
-            contentColor   = Color.Black,
+            contentColor   = OnAccent,
             modifier       = Modifier.align(Alignment.BottomEnd).padding(24.dp)
         ) {
             Icon(Icons.Default.Add, fabDescStr)
@@ -175,7 +175,7 @@ fun ScheduleCard(schedule: ScheduledRoutine, onDelete: () -> Unit) {
     }
 
     Card(
-        colors   = CardDefaults.cardColors(containerColor = Color(0xFF0D2020)),
+        colors   = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape    = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -328,7 +328,7 @@ fun MonthlyCalendar(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     "$num",
-                                    color      = if (isSelected) Color.Black else AccentWhite,
+                                    color      = if (isSelected) OnAccent else AccentWhite,
                                     fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
                                     fontSize   = 14.sp
                                 )
@@ -338,7 +338,7 @@ fun MonthlyCalendar(
                                         Modifier
                                             .size(4.dp)
                                             .background(
-                                                if (isSelected) Color.Black.copy(alpha = 0.5f) else AccentCyan,
+                                                if (isSelected) OnAccent.copy(alpha = 0.5f) else AccentCyan,
                                                 CircleShape
                                             )
                                     )
@@ -401,7 +401,7 @@ fun ScheduleDialog(
     val saveStr        = stringResource(R.string.schedule_save)
 
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(24.dp), color = Color(0xFF111111)) {
+        Surface(shape = RoundedCornerShape(24.dp), color = SurfaceDark) {
             LazyColumn(
                 modifier            = Modifier.padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -420,7 +420,7 @@ fun ScheduleDialog(
                             onClick  = { routineDropdown = true },
                             modifier = Modifier.fillMaxWidth(),
                             shape    = RoundedCornerShape(12.dp),
-                            border   = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                            border   = androidx.compose.foundation.BorderStroke(1.dp, BorderStrong)
                         ) {
                             Text(
                                 selectedRoutine?.name ?: noRoutinesStr,
@@ -436,7 +436,7 @@ fun ScheduleDialog(
                         ) {
                             routines.forEach { r ->
                                 DropdownMenuItem(
-                                    text    = { Text(r.name, color = Color(0xFF1C1C1E)) },
+                                    text    = { Text(r.name, color = TextPrimary) },
                                     onClick = { selectedRoutine = r; routineDropdown = false }
                                 )
                             }
@@ -472,7 +472,7 @@ fun ScheduleDialog(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape    = RoundedCornerShape(12.dp),
-                        border   = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, BorderStrong)
                     ) {
                         Icon(Icons.Default.CalendarToday, null, tint = AccentCyan, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
@@ -494,7 +494,7 @@ fun ScheduleDialog(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape    = RoundedCornerShape(12.dp),
-                        border   = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, BorderStrong)
                     ) {
                         Icon(Icons.Default.AccessTime, null, tint = AccentCyan, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
@@ -522,10 +522,10 @@ fun ScheduleDialog(
                                 onClick  = { recurrence = type },
                                 label    = { Text(label, fontSize = 11.sp) },
                                 colors   = FilterChipDefaults.filterChipColors(
-                                    containerColor         = Color(0xFF1A1A1A),
+                                    containerColor         = Border,
                                     labelColor             = TextSecondary,
                                     selectedContainerColor = AccentCyan,
-                                    selectedLabelColor     = Color.Black
+                                    selectedLabelColor     = OnAccent
                                 )
                             )
                         }
@@ -570,7 +570,7 @@ fun ScheduleDialog(
                             onClick  = onDismiss,
                             modifier = Modifier.weight(1f),
                             shape    = RoundedCornerShape(14.dp),
-                            border   = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                            border   = androidx.compose.foundation.BorderStroke(1.dp, BorderStrong)
                         ) {
                             Text(cancelStr, color = TextSecondary)
                         }
@@ -595,7 +595,7 @@ fun ScheduleDialog(
                             enabled  = selectedRoutine != null,
                             colors   = ButtonDefaults.buttonColors(
                                 containerColor = AccentCyan,
-                                contentColor   = Color.Black
+                                contentColor   = OnAccent
                             )
                         ) {
                             Text(saveStr, fontWeight = FontWeight.Bold)
@@ -625,13 +625,13 @@ fun WeekDaySelector(selected: Int, onSelect: (Int) -> Unit) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .background(if (isSelected) AccentCyan else Color(0xFF1A1A1A), CircleShape)
+                    .background(if (isSelected) AccentCyan else Border, CircleShape)
                     .clickable { onSelect(calDay) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     label,
-                    color      = if (isSelected) Color.Black else TextSecondary,
+                    color      = if (isSelected) OnAccent else TextSecondary,
                     fontWeight = FontWeight.Bold,
                     fontSize   = 13.sp
                 )

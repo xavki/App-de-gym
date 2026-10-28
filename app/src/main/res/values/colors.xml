@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fondo del tema claro (predeterminado): ventana de arranque sin destello negro -->
+    <color name="gf_background">#F7F9FC</color>
+</resources>

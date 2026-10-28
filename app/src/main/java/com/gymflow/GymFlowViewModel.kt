@@ -35,17 +35,36 @@ class GymFlowViewModel(
     var selectedRoutine by mutableStateOf<WorkoutSession?>(null)
     var selectedExercise by mutableStateOf<WorkoutExercise?>(null)
     val tempExercises = mutableStateListOf<WorkoutExercise>()
+    /** Buscador de ejercicios: texto, filtros, selección y posición se conservan al ir al detalle y volver. */
+    val exerciseSearch = ExerciseSearchState()
 
     // ─── Timer activo ───────────────────────────────────────────────────────
     var totalSeconds by mutableIntStateOf(0)
     private var timerJob: Job? = null
 
     var activeWorkout by mutableStateOf<WorkoutSession?>(null)
+
+    // ─── Entreno en curso guardado en el móvil (sobrevive a que Android cierre la app) ──
+    private val draftStore = ActiveWorkoutStore(appContext.filesDir)
+    /** Id del entreno en curso: al finalizar se guarda con él (repetir no crea duplicados). */
+    private var activeWorkoutId: String? = null
+    /** Usuario dueño del entreno en curso (fijado al empezar o recuperar, no al guardar). */
+    private var activeWorkoutUid: String? = null
+    private var workoutStartedAtMs: Long = 0
+    private var draftJob: Job? = null
+    /** Hay un entreno recuperado tras cerrar la app (para avisar en Inicio). */
+    var workoutRecovered by mutableStateOf(false)
     var activeWorkoutExerciseIndex by mutableIntStateOf(0)
 
-    // ─── Rest Timer ─────────────────────────────────────────────────────────
-    var restTimerSeconds by mutableIntStateOf(60)
-    var restTimerRunning by mutableStateOf(false)
+    // ─── Descanso entre series ──────────────────────────────────────────────
+    // Vive aquí (no en la pantalla) para seguir contando al cerrar el diálogo, cambiar de
+    // ejercicio o de pantalla. Reloj monotónico: sigue bien con la pantalla bloqueada.
+    private val restTimer = RestTimer { android.os.SystemClock.elapsedRealtime() }
+    private var restJob: Job? = null
+    var restStatus by mutableStateOf(RestTimer.Status.IDLE)
+        private set
+    var restSecondsLeft by mutableIntStateOf(0)
+        private set
 
     var isLoadingRoutines by mutableStateOf(false)
     var isLoadingHistory by mutableStateOf(false)
@@ -70,9 +89,23 @@ class GymFlowViewModel(
     // ─── Nuevo logro desbloqueado (para mostrar banner) ─────────────────────
     var newAchievement by mutableStateOf<Achievement?>(null)
 
-    // ─── Preferencias de entrenamiento ──────────────────────────────────────
-    var autoRestTimer      by mutableStateOf(false)  // Auto-iniciar timer al completar serie
-    var defaultRestSeconds by mutableIntStateOf(90)  // Duración del descanso automático
+    // ─── Preferencias de entrenamiento (se guardan en el móvil) ─────────────
+    private val prefs = appContext.getSharedPreferences("GymFlowPrefs", Context.MODE_PRIVATE)
+    private var autoRestState by mutableStateOf(prefs.getBoolean(PREF_AUTO_REST, false))
+    private var restSecondsState by mutableIntStateOf(prefs.getInt(PREF_REST_SECONDS, 90))
+    /** Empezar el descanso automáticamente al marcar una serie como hecha. */
+    var autoRestTimer: Boolean
+        get() = autoRestState
+        set(value) { autoRestState = value; prefs.edit().putBoolean(PREF_AUTO_REST, value).apply() }
+    /** Tema oscuro elegido por el usuario (por defecto, claro). */
+    private var darkThemeState by mutableStateOf(ThemePrefs.isDark(appContext))
+    var darkTheme: Boolean
+        get() = darkThemeState
+        set(value) { darkThemeState = value; ThemePrefs.setDark(appContext, value) }
+    /** Duración del descanso (segundos). */
+    var defaultRestSeconds: Int
+        get() = restSecondsState
+        set(value) { restSecondsState = value.coerceIn(15, 600); prefs.edit().putInt(PREF_REST_SECONDS, restSecondsState).apply() }
 
     // ─── Sincronización (declarado antes de init: init ya lo usa) ───────────
     var syncState by mutableStateOf<SyncState>(SyncState.Idle)
@@ -88,7 +121,9 @@ class GymFlowViewModel(
             if (user == null) {
                 clearData()
             } else {
+                restoreDraft(user.uid)
                 viewModelScope.launch {
+                    savePendingFinishes(user.uid)   // entrenos finalizados que no llegaron a Room
                     loadAll()   // lo local aparece al instante
                     FirestoreImporter.importUserDataIfNeeded(appContext, repo, db, user.uid)
                     loadAll()
@@ -182,18 +217,144 @@ class GymFlowViewModel(
     fun startWorkout(routine: WorkoutSession) {
         activeWorkout = routine
         activeWorkoutExerciseIndex = 0
-        restTimerSeconds = 60
-        restTimerRunning = false
+        activeWorkoutId = java.util.UUID.randomUUID().toString()
+        activeWorkoutUid = auth.currentUser?.uid
+        workoutStartedAtMs = System.currentTimeMillis()
+        workoutRecovered = false
+        cancelRest()
         totalSeconds = 0
         startTimer()
+        saveDraftNow()
+    }
+
+    // ── Borrador del entreno en curso ─────────────────────────────────────────
+
+    private fun currentDraft(): ActiveWorkoutDraft? {
+        val w = activeWorkout ?: return null
+        return ActiveWorkoutDraft(
+            draftId = activeWorkoutId ?: java.util.UUID.randomUUID().toString().also { activeWorkoutId = it },
+            uid = activeWorkoutUid, session = w, startedAtMs = workoutStartedAtMs,
+            exerciseIndex = activeWorkoutExerciseIndex, savedAtMs = System.currentTimeMillis(),
+        )
+    }
+
+    /** Guarda ya (en el hilo actual): al pasar a segundo plano, antes de que Android pueda cerrar la app. */
+    fun saveDraftNow() {
+        val d = currentDraft() ?: return
+        try { draftStore.write(d.uid, draftStore.encode(d)) } catch (_: Exception) { }
+    }
+
+    /** Guarda en breve (agrupa las pulsaciones seguidas). Se serializa en el hilo principal: copia coherente. */
+    fun saveDraftSoon() {
+        if (activeWorkout == null) return
+        draftJob?.cancel()
+        draftJob = viewModelScope.launch {
+            delay(800)
+            val d = currentDraft() ?: return@launch
+            val json = draftStore.encode(d)
+            withContext(Dispatchers.IO) { try { draftStore.write(d.uid, json) } catch (_: Exception) { } }
+        }
+    }
+
+    /**
+     * Recupera el entreno que quedó a medias (proceso cerrado por Android, app cerrada…).
+     * Solo si no hay ya uno en marcha y pertenece al mismo usuario. La duración se recalcula
+     * desde el inicio real.
+     */
+    fun restoreDraft(uid: String?) {
+        if (activeWorkout != null) return
+        val d = draftStore.read(uid) ?: return
+        if (d.uid != uid) return
+        activeWorkoutId = d.draftId
+        activeWorkoutUid = d.uid
+        workoutStartedAtMs = ActiveWorkoutStore.resumeStartMs(d, System.currentTimeMillis())
+        activeWorkout = d.session
+        activeWorkoutExerciseIndex = d.exerciseIndex.coerceIn(0, (d.session.exercises.size - 1).coerceAtLeast(0))
+        workoutRecovered = true
+        startTimer()
+    }
+
+    /** Descarta el entreno en curso: no se guarda nada y se borra el borrador. */
+    fun discardWorkout() {
+        stopTimer()
+        cancelRest()
+        draftJob?.cancel()
+        draftStore.clear(activeWorkoutUid)
+        activeWorkout = null
+        activeWorkoutId = null
+        activeWorkoutUid = null
+        activeWorkoutExerciseIndex = 0
+        totalSeconds = 0
+        workoutRecovered = false
+    }
+
+    // ── Descanso ──────────────────────────────────────────────────────────────
+
+    /** Empieza un descanso nuevo (sustituye al que hubiera) con la duración configurada. */
+    fun startRest(seconds: Int = defaultRestSeconds) {
+        restTimer.start(seconds)
+        RestAlert.cancelBackground(appContext)
+        runRestTicker()
+    }
+
+    fun pauseRest() { restTimer.pause(); publishRest() }
+    fun resumeRest() { restTimer.resume(); runRestTicker() }
+    /** Vuelve a empezar el descanso actual desde su duración. */
+    fun restartRest() { restTimer.restart(defaultRestSeconds); RestAlert.cancelBackground(appContext); runRestTicker() }
+    fun addRestSeconds(seconds: Int) { restTimer.add(seconds); publishRest() }
+
+    fun cancelRest() {
+        restJob?.cancel()
+        restTimer.cancel()
+        RestAlert.cancelBackground(appContext)
+        publishRest()
+    }
+
+    private fun publishRest() {
+        restStatus = restTimer.status
+        restSecondsLeft = restTimer.remainingSeconds()
+    }
+
+    /** Un solo bucle de refresco; el tiempo real lo da el reloj, no el número de vueltas. */
+    private fun runRestTicker() {
+        publishRest()
+        if (restJob?.isActive == true) return
+        restJob = viewModelScope.launch {
+            while (isActive) {
+                if (restTimer.tick()) RestAlert.playInApp(appContext)
+                publishRest()
+                if (restTimer.status != RestTimer.Status.RUNNING) break
+                delay(200L)
+            }
+        }
+    }
+
+    /** La app pasa a segundo plano: si hay descanso en marcha, avisa la alarma del sistema. */
+    fun onAppBackground() {
+        saveDraftNow()
+        if (restTimer.status != RestTimer.Status.RUNNING) return
+        restTimer.delegateAlert()
+        RestAlert.scheduleBackground(appContext, restTimer.remainingMs())
+    }
+
+    /** La app vuelve: si el descanso no ha acabado, el aviso lo vuelve a dar la app. */
+    fun onAppForeground() {
+        if (restTimer.status == RestTimer.Status.RUNNING) {
+            RestAlert.cancelBackground(appContext)
+            restTimer.reclaimAlert()
+            runRestTicker()
+        } else {
+            publishRest()
+        }
     }
 
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
+            // Desde la hora de inicio real: tras recuperar un entreno la duración sigue siendo la buena
             while (isActive) {
+                totalSeconds = (((System.currentTimeMillis() - workoutStartedAtMs) / 1000).toInt()).coerceAtLeast(0)
                 delay(1000L)
-                totalSeconds++
             }
         }
     }
@@ -204,6 +365,11 @@ class GymFlowViewModel(
     }
 
     fun clearData() {
+        // Al cerrar sesión el entreno en curso queda en el borrador de su usuario (no se pierde)
+        saveDraftNow()
+        draftJob?.cancel()
+        activeWorkoutId = null
+        activeWorkoutUid = null
         stopTimer()
         routines.clear()
         workoutHistory.clear()
@@ -216,18 +382,33 @@ class GymFlowViewModel(
         tempExercises.clear()
         activeWorkout = null
         activeWorkoutExerciseIndex = 0
-        restTimerSeconds = 60
-        restTimerRunning = false
+        cancelRest()
         totalSeconds = 0
     }
 
     fun finishWorkout(routine: WorkoutSession) {
         val user = auth.currentUser ?: return
+        // Segunda pulsación de Finalizar (o con el entreno ya cerrado): no hay nada más que guardar.
+        // Sin esto se guardaba otra vez con un id nuevo y quedaba duplicado.
+        if (activeWorkout == null) return
         stopTimer()
 
         routine.durationSeconds = totalSeconds
         routine.userId = user.uid
         val startedAt = System.currentTimeMillis() - totalSeconds * 1000L
+        // Mismo id que el borrador: si se repite el guardado (recuperación) no se duplica.
+        val workoutId = activeWorkoutId ?: java.util.UUID.randomUUID().toString()
+        draftJob?.cancel()
+        // Primero queda en disco como finalizado pendiente y después se quita el borrador: si Room
+        // falla o Android cierra la app antes de guardar, se guarda al volver a abrirla.
+        val pending = PendingFinish(workoutId, user.uid, routine.id, routine, startedAt)
+        try {
+            draftStore.addPendingFinish(pending)
+            draftStore.clear(activeWorkoutUid)
+        } catch (_: Exception) { } // sin disco: el borrador sigue ahí y el guardado en Room continúa
+        activeWorkoutId = null
+        activeWorkoutUid = null
+        workoutRecovered = false
 
         val cleanedExercises = routine.exercises.map { ex ->
             ex.copy(sets = ex.sets.map { it.copy(isCompleted = false, rpe = null) }.toMutableList())
@@ -235,18 +416,42 @@ class GymFlowViewModel(
 
         activeWorkout = null
         activeWorkoutExerciseIndex = 0
-        restTimerSeconds = 60
-        restTimerRunning = false
+        cancelRest()
         totalSeconds = 0
 
         viewModelScope.launch {
-            repo.saveWorkout(user.uid, routine, routineId = routine.id, startedAt = startedAt)
-            // La rutina recuerda los últimos pesos usados
-            repo.saveRoutine(user.uid, routine.copy(exercises = cleanedExercises))
+            try {
+                repo.saveWorkout(user.uid, routine, routineId = routine.id, workoutId = workoutId, startedAt = startedAt)
+            } catch (e: Exception) {
+                errorMessage = "No se pudo guardar el entreno. Sigue en el móvil y se guardará al volver a abrir la app."
+                return@launch
+            }
+            draftStore.removePendingFinish(workoutId)
+            try {
+                // La rutina recuerda los últimos pesos usados
+                repo.saveRoutine(user.uid, routine.copy(exercises = cleanedExercises))
+            } catch (_: Exception) { }
             changed()
             reloadRoutines(user.uid)
             reloadHistory(user.uid)
             checkAchievements(routine)
+        }
+    }
+
+    /**
+     * Guarda en Room los entrenos finalizados que no llegaron a guardarse (fallo de Room o app
+     * cerrada justo al finalizar). Si ya estaban, solo se retira el pendiente: no se duplican ni
+     * se recrean entrenos que el usuario borró después.
+     */
+    suspend fun savePendingFinishes(uid: String) {
+        for (p in draftStore.pendingFinishes(uid)) {
+            try {
+                if (!repo.workoutExists(p.workoutId)) {
+                    repo.saveWorkout(uid, p.session, routineId = p.routineId, workoutId = p.workoutId, startedAt = p.startedAtMs)
+                    changed()
+                }
+                draftStore.removePendingFinish(p.workoutId)
+            } catch (_: Exception) { } // se reintenta en la próxima apertura
         }
     }
 
@@ -503,23 +708,8 @@ class GymFlowViewModel(
     // STREAK & ACHIEVEMENTS
     // ══════════════════════════════════════════════════════════════════════════
 
-    private fun computeStreak(): Int {
-        if (workoutHistory.isEmpty()) return 0
-        val sorted = workoutHistory
-            .map { midnight(it.date.time) }
-            .distinct()
-            .sortedDescending()
-        val today = midnight(System.currentTimeMillis())
-        val yesterday = today - 86_400_000L
-        // Si no hay entrenamiento hoy ni ayer → racha en 0
-        if (sorted.first() != today && sorted.first() != yesterday) return 0
-        var streak = 0
-        var expected = if (sorted.first() == today) today else yesterday
-        for (day in sorted) {
-            if (day == expected) { streak++; expected -= 86_400_000L } else break
-        }
-        return streak
-    }
+    private fun computeStreak(): Int =
+        TrainingStats.streak(workoutHistory.map { it.date.time }, System.currentTimeMillis())
 
     fun loadAchievements() {
         val uid = auth.currentUser?.uid ?: return
@@ -587,17 +777,10 @@ class GymFlowViewModel(
             onDone(ok)
         }
     }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // HELPERS
-    // ══════════════════════════════════════════════════════════════════════════
-
-    private fun midnight(ms: Long): Long = Calendar.getInstance().apply {
-        timeInMillis = ms
-        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0);      set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
 }
+
+private const val PREF_AUTO_REST = "auto_rest_timer"
+private const val PREF_REST_SECONDS = "rest_seconds"
 
 // ─── 1RM Fórmulas (top-level para reusar en UI) ───────────────────────────────
 fun oneRMBrzycki(weight: Double, reps: Int): Double =

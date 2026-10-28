@@ -95,6 +95,10 @@ interface GymDao {
     @Query("SELECT COUNT(*) FROM workouts WHERE userId = :uid")
     suspend fun workoutCount(uid: String): Int
 
+    /** Incluye los borrados: un entreno ya guardado (aunque luego se borrase) no se vuelve a crear. */
+    @Query("SELECT COUNT(*) FROM workouts WHERE id = :id")
+    suspend fun workoutIdCount(id: String): Int
+
     // ─── Medidas, programaciones y logros ────────────────────────────────────
     @Upsert suspend fun upsertMeasurements(items: List<BodyMeasurementEntity>)
 

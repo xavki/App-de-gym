@@ -48,7 +48,7 @@ fun ShareWorkoutDialog(
     val sets = summary.exercises.sumOf { it.sets.count { s -> s.isCompleted } }
 
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(28.dp), color = Color(0xFF0D1A1A)) {
+        Surface(shape = RoundedCornerShape(28.dp), color = SurfaceDark) {
             Column(modifier = Modifier.padding(0.dp)) {
 
                 // ── Preview de la card ────────────────────────────────────────
@@ -57,7 +57,7 @@ fun ShareWorkoutDialog(
                         .fillMaxWidth()
                         .background(
                             androidx.compose.ui.graphics.Brush.verticalGradient(
-                                listOf(Color(0xFF0A1A1A), Color(0xFF000000))
+                                listOf(SurfaceAlt, BackgroundDark)
                             ),
                             RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                         )
@@ -96,7 +96,7 @@ fun ShareWorkoutDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        ex.exerciseName,
+                                        ExerciseNamesEs.display(ex.exerciseName),
                                         color = TextPrimary,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
@@ -117,11 +117,11 @@ fun ShareWorkoutDialog(
                         Spacer(Modifier.height(16.dp))
                         // Footer
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.weight(1f).height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+                            Box(modifier = Modifier.weight(1f).height(1.dp).background(TextPrimary.copy(alpha = 0.08f)))
                             Spacer(Modifier.width(8.dp))
                             Text("gymflow.app", color = TextSecondary.copy(alpha = 0.5f), fontSize = 10.sp, letterSpacing = 1.sp)
                             Spacer(Modifier.width(8.dp))
-                            Box(modifier = Modifier.weight(1f).height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+                            Box(modifier = Modifier.weight(1f).height(1.dp).background(TextPrimary.copy(alpha = 0.08f)))
                         }
                     }
                 }
@@ -135,7 +135,7 @@ fun ShareWorkoutDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderStrong)
                     ) { Text(stringResource(R.string.settings_close), color = TextSecondary) }
 
                     Button(
@@ -145,7 +145,7 @@ fun ShareWorkoutDialog(
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = Color.Black)
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = OnAccent)
                     ) {
                         Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
@@ -161,7 +161,7 @@ fun ShareWorkoutDialog(
 private fun ShareStatChip(emoji: String, value: String, label: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+            .background(TextPrimary.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
             .padding(10.dp),
         contentAlignment = Alignment.Center
     ) {

@@ -114,14 +114,14 @@ private fun SortChip(label: String, selected: Boolean, onClick: () -> Unit) {
         colors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = AccentCyan.copy(alpha = 0.18f),
             selectedLabelColor = AccentCyan,
-            containerColor = Color(0xFF0A0A0A),
+            containerColor = SurfaceDark,
             labelColor = TextSecondary
         ),
         border = FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = selected,
             selectedBorderColor = AccentCyan.copy(alpha = 0.4f),
-            borderColor = Color(0xFF1A1A1A)
+            borderColor = Border
         )
     )
 }
@@ -141,7 +141,7 @@ private fun PRCard(pr: ExercisePR, rank: Int) {
 
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = if (isTop3) Color(0xFF0D1A1A) else Color(0xFF0A0A0A)
+            containerColor = if (isTop3) SurfaceDark else SurfaceDark
         ),
         shape = RoundedCornerShape(18.dp),
         modifier = Modifier.fillMaxWidth()
@@ -153,7 +153,7 @@ private fun PRCard(pr: ExercisePR, rank: Int) {
                     modifier = Modifier
                         .size(36.dp)
                         .background(
-                            if (isTop3) AccentCyan.copy(alpha = 0.1f) else Color(0xFF1A1A1A),
+                            if (isTop3) AccentCyan.copy(alpha = 0.1f) else Border,
                             RoundedCornerShape(10.dp)
                         ),
                     contentAlignment = Alignment.Center
@@ -167,7 +167,7 @@ private fun PRCard(pr: ExercisePR, rank: Int) {
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(pr.name, color = TextPrimary, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                    Text(ExerciseNamesEs.display(pr.name), color = TextPrimary, fontWeight = FontWeight.Black, fontSize = 15.sp)
                     Text(sdf.format(pr.date), color = TextSecondary, fontSize = 11.sp)
                 }
             }
@@ -178,20 +178,20 @@ private fun PRCard(pr: ExercisePR, rank: Int) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PRStat(
                     label = "Mejor set",
-                    value = "${pr.bestWeight}kg × ${pr.bestReps}",
+                    value = "${fmtKg(pr.bestWeight)} × ${pr.bestReps}",
                     color = AccentCyan,
                     modifier = Modifier.weight(1f)
                 )
                 PRStat(
                     label = "1RM est.",
                     value = "${pr.estimatedOneRM.roundToInt()} kg",
-                    color = Color(0xFFFFD700),
+                    color = Gold,
                     modifier = Modifier.weight(1f)
                 )
                 PRStat(
                     label = "Volumen",
                     value = "${pr.bestVolume.roundToInt()} kg",
-                    color = Color(0xFF4CAF50),
+                    color = Success,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -212,7 +212,7 @@ private fun PRCard(pr: ExercisePR, rank: Int) {
 @Composable
 private fun PRStat(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A1010)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
         shape = RoundedCornerShape(10.dp),
         modifier = modifier
     ) {
@@ -226,6 +226,7 @@ private fun PRStat(label: String, value: String, color: Color, modifier: Modifie
 
 @Composable
 private fun SparkLine(points: List<Float>, progress: Float, modifier: Modifier = Modifier) {
+    val pal = LocalPalette.current
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
@@ -238,10 +239,10 @@ private fun SparkLine(points: List<Float>, progress: Float, modifier: Modifier =
         }
         val drawUntil = (pts.size * progress).toInt().coerceAtMost(pts.size - 1)
         for (i in 0 until drawUntil) {
-            drawLine(AccentCyan, pts[i], pts[i + 1], strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
+            drawLine(pal.accent, pts[i], pts[i + 1], strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
         }
         if (drawUntil < pts.size) {
-            drawCircle(AccentCyan, 4.dp.toPx(), pts[drawUntil])
+            drawCircle(pal.accent, 4.dp.toPx(), pts[drawUntil])
         }
     }
 }
@@ -249,7 +250,7 @@ private fun SparkLine(points: List<Float>, progress: Float, modifier: Modifier =
 @Composable
 private fun EmptyPRHint() {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -286,7 +287,7 @@ fun computePRs(history: List<WorkoutSession>): List<ExercisePR> {
         val orm = oneRMBrzycki(bestSet.weight, bestSet.repetitions.coerceAtLeast(1))
 
         // Sparkline: volumen por sesión (agrupado por día)
-        val byDay = entries.groupBy { (d, _) -> d.time / 86400000 }
+        val byDay = entries.groupBy { (d, _) -> TrainingStats.startOfDay(d.time) }
             .values.map { dayEntries -> dayEntries.maxOf { (_, s) -> (s.weight * s.repetitions).toFloat() } }
 
         ExercisePR(

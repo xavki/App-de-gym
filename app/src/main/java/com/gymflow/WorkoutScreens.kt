@@ -1,5 +1,9 @@
 package com.gymflow
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import android.content.Context
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -85,6 +89,13 @@ fun playDingSound() {
     } catch (_: Exception) { /* no-op si falla */ }
 }
 
+/** Peso de referencia ("Anterior", "Última sesión"): un decimal con coma, sin ",0". */
+fun fmtPrev(w: Double): String { val r = Math.round(w * 10) / 10.0; return if (r % 1.0 == 0.0) r.toLong().toString() else r.toString().replace('.', ',') }
+
+/** Peso para los campos: "70" en vez de "70.0" y coma decimal ("72,5"). */
+fun fmtWeightInput(w: Double): String =
+    if (w % 1.0 == 0.0) w.toLong().toString() else w.toString().replace('.', ',')
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // WORKOUT SCREEN
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -139,11 +150,15 @@ fun WorkoutScreen(
     }
 
     // Sincronizamos los cambios de vuelta al objeto original
-    LaunchedEffect(currentSets.size) {
+    // Cualquier cambio (añadir, quitar, marcar, cambiar tipo) se copia al entreno: los mismos objetos,
+    // así que también los pesos y repeticiones que se escriben. Antes solo se copiaba al cambiar el
+    // número de series y se perdían las marcas de "hecha" y los tipos de serie.
+    LaunchedEffect(currentSets.toList()) {
         ex?.let {
             it.sets.clear()
             it.sets.addAll(currentSets)
         }
+        viewModel.saveDraftSoon()
     }
 
     // ── Contador de volumen total ────────────────────────────────────────
@@ -179,7 +194,22 @@ fun WorkoutScreen(
                     }
                 },
                 navigationIcon = { IconButton(onClick = onMinimize) { Icon(Icons.Default.ExpandMore, null, tint = AccentWhite) } },
-                actions = { TextButton(onClick = onFinish) { Text(stringResource(R.string.workout_finish), color = AccentCyan, fontWeight = FontWeight.Black) } },
+                actions = {
+                    RestChip(viewModel) { showRestTimer = true }
+                    var confirmDiscard by remember { mutableStateOf(false) }
+                    IconButton(onClick = { confirmDiscard = true }) { Icon(Icons.Default.DeleteOutline, "Descartar entreno", tint = TextSecondary) }
+                    if (confirmDiscard) {
+                        AlertDialog(
+                            onDismissRequest = { confirmDiscard = false },
+                            containerColor = SurfaceDark,
+                            title = { Text("¿Descartar el entreno?", color = TextPrimary, fontWeight = FontWeight.Bold) },
+                            text = { Text("No se guardará nada de esta sesión.", color = TextSecondary) },
+                            confirmButton = { TextButton(onClick = { confirmDiscard = false; viewModel.discardWorkout(); onMinimize() }) { Text("Descartar", color = AccentRed, fontWeight = FontWeight.Bold) } },
+                            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Seguir entrenando", color = AccentCyan) } }
+                        )
+                    }
+                    TextButton(onClick = onFinish) { Text(stringResource(R.string.workout_finish), color = AccentCyan, fontWeight = FontWeight.Black) }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
             )
         }
@@ -213,7 +243,7 @@ fun WorkoutScreen(
                         .height(4.dp)
                         .clip(RoundedCornerShape(2.dp)),
                     color = AccentCyan,
-                    trackColor = Color(0xFF1A2A2A)
+                    trackColor = SurfaceAlt
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -227,7 +257,7 @@ fun WorkoutScreen(
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                definition?.nameEs ?: ex.exerciseName,
+                                ExerciseNamesEs.display(ex.exerciseName),
                                 color = TextPrimary,
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Black,
@@ -238,8 +268,12 @@ fun WorkoutScreen(
                             IconButton(onClick = { showOneRM = true }) {
                                 Icon(Icons.Default.Calculate, null, tint = AccentCyan.copy(alpha = 0.7f))
                             }
-                            IconButton(onClick = { showRestTimer = true }) {
-                                Icon(Icons.Default.Timer, null, tint = AccentCyan)
+                            IconButton(onClick = {
+                                // Sin descanso en marcha, el botón empieza uno nuevo con la duración configurada
+                                if (viewModel.restStatus == RestTimer.Status.IDLE || viewModel.restStatus == RestTimer.Status.FINISHED) viewModel.startRest()
+                                showRestTimer = true
+                            }) {
+                                Icon(Icons.Default.Timer, "Descanso", tint = AccentCyan)
                             }
                             IconButton(onClick = { onInfoClick(ex) }) {
                                 Icon(Icons.Outlined.Info, null, tint = AccentCyan)
@@ -259,7 +293,7 @@ fun WorkoutScreen(
                         var notesText by remember(ex.id) { mutableStateOf(ex.notes ?: "") }
                         OutlinedTextField(
                             value = notesText,
-                            onValueChange = { notesText = it; ex.notes = it },
+                            onValueChange = { notesText = it; ex.notes = it; viewModel.saveDraftSoon() },
                             label = { Text("📝 Notas", fontSize = 11.sp) },
                             placeholder = { Text("Técnica, sensaciones...", fontSize = 11.sp, color = TextSecondary.copy(alpha = 0.4f)) },
                             modifier = Modifier.fillMaxWidth(),
@@ -267,7 +301,7 @@ fun WorkoutScreen(
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor   = AccentCyan.copy(alpha = 0.5f),
-                                unfocusedBorderColor = Color(0xFF1A2A2A),
+                                unfocusedBorderColor = SurfaceAlt,
                                 focusedTextColor     = TextPrimary,
                                 unfocusedTextColor   = TextPrimary,
                                 focusedLabelColor    = AccentCyan,
@@ -285,7 +319,7 @@ fun WorkoutScreen(
                                 Text("Última sesión: ", color = TextSecondary, fontSize = 11.sp)
                                 lastSessionSets.take(3).forEachIndexed { i, s ->
                                     if (i > 0) Text(" · ", color = TextSecondary, fontSize = 11.sp)
-                                    Text("${s.weight}×${s.repetitions}", color = AccentCyan.copy(alpha = 0.7f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("${fmtPrev(s.weight)}×${s.repetitions}", color = AccentCyan.copy(alpha = 0.7f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 if (lastSessionSets.size > 3) Text(" ...", color = TextSecondary, fontSize = 11.sp)
                             }
@@ -306,40 +340,53 @@ fun WorkoutScreen(
 
                     items(items = currentSets, key = { it.id }) { set ->
                         val index = currentSets.indexOf(set)
-                        
+                        val isCurrent = index == currentSets.indexOfFirst { !it.isCompleted }
+                        val isWarmup = set.setType == SetType.WARMUP
+                        // Serie de la sesión anterior en la misma posición (solo si existe)
+                        val prev = lastSessionSets.getOrNull(index)
                         Card(
                             colors = CardDefaults.cardColors(
-                                containerColor = if (set.isCompleted) Color(0xFF152A2A) else SurfaceDark
+                                containerColor = when {
+                                    set.isCompleted -> AccentTeal.copy(alpha = 0.10f)
+                                    isWarmup -> SurfaceAlt
+                                    else -> SurfaceDark
+                                }
                             ),
+                            border = if (isCurrent) androidx.compose.foundation.BorderStroke(2.dp, AccentCyan) else null,
                             shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                .semantics(mergeDescendants = false) {
+                                    contentDescription = buildString {
+                                        append(if (isWarmup) "Calentamiento" else "Serie ${index + 1}")
+                                        if (isCurrent) append(", serie actual")
+                                        if (set.isCompleted) append(", hecha")
+                                    }
+                                }
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(12.dp)
-                            ) {
+                            Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 // Badge de tipo de serie (pulsable para cambiar)
                                 var showSetTypePicker by remember { mutableStateOf(false) }
                                 val setTypeColor = when (set.setType) {
-                                    SetType.WARMUP   -> Color(0xFF888888)
+                                    SetType.WARMUP   -> Gold
                                     SetType.DROP_SET -> Color(0xFFFF6B35)
                                     SetType.FAILURE  -> Color(0xFF9C27B0)
-                                    else             -> if (set.isCompleted) AccentCyan else Color.DarkGray
+                                    else             -> if (set.isCompleted) AccentTeal else AccentCyan
                                 }
                                 val setTypeLabel = when (set.setType) {
-                                    SetType.WARMUP   -> "W"
+                                    SetType.WARMUP   -> "C"
                                     SetType.DROP_SET -> "D"
                                     SetType.FAILURE  -> "F"
                                     else             -> "${index + 1}"
                                 }
                                 Box(
                                     modifier = Modifier
-                                        .size(28.dp)
+                                        .size(36.dp)
                                         .background(setTypeColor, CircleShape)
-                                        .clickable { showSetTypePicker = true },
+                                        .clickable(onClickLabel = "Cambiar tipo de serie") { showSetTypePicker = true },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(setTypeLabel, color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(setTypeLabel, color = OnAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
                                 if (showSetTypePicker) {
                                     SetTypePickerDialog(
@@ -353,7 +400,20 @@ fun WorkoutScreen(
                                     )
                                 }
                                 
-                                Spacer(Modifier.width(12.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text(if (isWarmup) "Calentamiento" else "Serie ${index + 1}", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                if (prev != null && !isCardio) {
+                                    Text("  ·  Anterior: ${fmtPrev(prev.weight)} × ${prev.repetitions}", color = TextSecondary, fontSize = 13.sp,
+                                        maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                } else Spacer(Modifier.weight(1f))
+                                if (currentSets.size > 1) {
+                                    IconButton(onClick = { currentSets.remove(set) }) {
+                                        Icon(Icons.Default.RemoveCircleOutline, "Quitar serie", tint = AccentRed.copy(alpha = 0.7f))
+                                    }
+                                }
+                            }  // fin línea superior
+                            Spacer(Modifier.height(6.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
 
                                 if (isCardio) {
                                     // Diseño para Cardio: Temporizador
@@ -370,20 +430,21 @@ fun WorkoutScreen(
                                 } else {
                                     // Diseño para Pesas: KG y REPS
                                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                                        var weightText by remember(set.id) { mutableStateOf(if(set.weight == 0.0) "" else set.weight.toString()) }
+                                        var weightText by remember(set.id) { mutableStateOf(if (set.weight == 0.0) "" else fmtWeightInput(set.weight)) }
                                         OutlinedTextField(
                                             value = weightText,
                                             onValueChange = { 
                                                 weightText = it
-                                                set.weight = it.toDoubleOrNull() ?: 0.0
+                                                set.weight = it.replace(',', '.').toDoubleOrNull() ?: 0.0
+                                                viewModel.saveDraftSoon()
                                             },
-                                            label = { Text("KG", fontSize = 10.sp) },
-                                            modifier = Modifier.width(76.dp),
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            label = { Text("Kg", fontSize = 11.sp) },
+                                            modifier = Modifier.weight(1.1f),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                             singleLine = true,
                                             colors = OutlinedTextFieldDefaults.colors(
                                                 focusedBorderColor = AccentCyan,
-                                                unfocusedBorderColor = Color.DarkGray,
+                                                unfocusedBorderColor = BorderStrong,
                                                 focusedTextColor = TextPrimary,
                                                 unfocusedTextColor = TextPrimary
                                             )
@@ -397,14 +458,15 @@ fun WorkoutScreen(
                                             onValueChange = { 
                                                 repsText = it
                                                 set.repetitions = it.toIntOrNull() ?: 0
+                                                viewModel.saveDraftSoon()
                                             },
-                                            label = { Text("REPS", fontSize = 10.sp) },
-                                            modifier = Modifier.width(72.dp),
+                                            label = { Text("Reps", fontSize = 11.sp) },
+                                            modifier = Modifier.weight(1f),
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             singleLine = true,
                                             colors = OutlinedTextFieldDefaults.colors(
                                                 focusedBorderColor = AccentCyan,
-                                                unfocusedBorderColor = Color.DarkGray,
+                                                unfocusedBorderColor = BorderStrong,
                                                 focusedTextColor = TextPrimary,
                                                 unfocusedTextColor = TextPrimary
                                             )
@@ -426,7 +488,7 @@ fun WorkoutScreen(
                                             singleLine = true,
                                             colors = OutlinedTextFieldDefaults.colors(
                                                 focusedBorderColor = AccentCyan,
-                                                unfocusedBorderColor = Color.DarkGray,
+                                                unfocusedBorderColor = BorderStrong,
                                                 focusedTextColor = TextPrimary,
                                                 unfocusedTextColor = TextPrimary
                                             )
@@ -436,7 +498,12 @@ fun WorkoutScreen(
 
                                 Spacer(Modifier.width(8.dp))
 
-                                Checkbox(
+                                FilledIconToggleButton(
+                                    modifier = Modifier.size(48.dp),
+                                    colors = IconButtonDefaults.filledIconToggleButtonColors(
+                                        containerColor = SurfaceAlt, contentColor = TextSecondary,
+                                        checkedContainerColor = AccentTeal, checkedContentColor = OnAccent
+                                    ),
                                     checked = set.isCompleted,
                                     onCheckedChange = { isChecked ->
                                         val idx = currentSets.indexOf(set)
@@ -449,26 +516,18 @@ fun WorkoutScreen(
                                                 if (ex != null && viewModel.checkPersonalRecord(ex.exerciseName, w, r)) {
                                                     viewModel.newPersonalRecord = ex.exerciseName
                                                 }
-                                                // ⏱️ Auto-start rest timer
-                                                if (viewModel.autoRestTimer) {
-                                                    viewModel.restTimerSeconds = viewModel.defaultRestSeconds
-                                                    viewModel.restTimerRunning = true
-                                                    showRestTimer = true
-                                                }
+                                                // Descanso automático: uno nuevo sustituye al anterior; se ve en la barra superior
+                                                if (viewModel.autoRestTimer) viewModel.startRest()
                                             }
                                         }
                                     },
-                                    colors = CheckboxDefaults.colors(checkedColor = AccentCyan, uncheckedColor = Color.Gray)
+                                    content = {
+                                        Icon(Icons.Default.Check, if (set.isCompleted) "Desmarcar serie" else "Marcar serie como hecha", modifier = Modifier.size(26.dp))
+                                    }
                                 )
 
-                                if (currentSets.size > 1) {
-                                    IconButton(onClick = { 
-                                        currentSets.remove(set)
-                                    }) {
-                                        Icon(Icons.Default.RemoveCircleOutline, null, tint = AccentRed.copy(alpha = 0.7f))
-                                    }
-                                }
                             }
+                                }  // fin Column de la serie
                         }
                     }
 
@@ -477,12 +536,12 @@ fun WorkoutScreen(
                         val pr = viewModel.newPersonalRecord
                         if (pr != null) {
                             val defPr = ExerciseRepository.getCached().find { it.name == pr }
-                            val prName = defPr?.nameEs ?: pr
+                            val prName = ExerciseNamesEs.display(pr)
                             LaunchedEffect(pr) { delay(3000); viewModel.newPersonalRecord = null }
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                                 shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF2A1A00))
+                                colors = CardDefaults.cardColors(containerColor = SurfaceAlt)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -491,40 +550,14 @@ fun WorkoutScreen(
                                     Text("🏆", fontSize = 22.sp)
                                     Spacer(Modifier.width(10.dp))
                                     Column {
-                                        Text("NUEVO RÉCORD PERSONAL", color = Color(0xFFFFD700), fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                                        Text("NUEVO RÉCORD PERSONAL", color = Gold, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                                         Text(prName, color = AccentWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
-                        // ── Notas del ejercicio ─────────────────────────────
-                        var noteText by remember(ex.id) { mutableStateOf(ex.notes ?: "") }
                         Spacer(Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = noteText,
-                            onValueChange = {
-                                noteText = it
-                                ex.notes = it
-                            },
-                            placeholder = { Text(stringResource(R.string.workout_add_note), color = TextSecondary.copy(alpha = 0.5f), fontSize = 13.sp) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            singleLine = false,
-                            maxLines = 2,
-                            leadingIcon = { Icon(Icons.Default.StickyNote2, null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = AccentCyan.copy(alpha = 0.5f),
-                                unfocusedBorderColor = Color(0xFF1A1A1A),
-                                cursorColor = AccentCyan,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary,
-                                focusedContainerColor = Color(0xFF080808),
-                                unfocusedContainerColor = Color(0xFF080808)
-                            )
-                        )
-                        
-                        Spacer(Modifier.height(16.dp))
-                        
+
                         val prevStr = stringResource(R.string.workout_previous)
                         val nextStr = stringResource(R.string.workout_next)
                         val endStr  = stringResource(R.string.workout_end)
@@ -532,7 +565,7 @@ fun WorkoutScreen(
                             if (currentIndex > 0) {
                                 ModernButton(
                                     prevStr, 
-                                    onClick = { viewModel.activeWorkoutExerciseIndex-- }, 
+                                    onClick = { viewModel.activeWorkoutExerciseIndex--; viewModel.saveDraftSoon() }, 
                                     modifier = Modifier.weight(1f), 
                                     containerColor = SurfaceDark, 
                                     contentColor = AccentWhite
@@ -541,7 +574,7 @@ fun WorkoutScreen(
                             ModernButton(
                                 if (currentIndex < routine.exercises.size - 1) nextStr else endStr,
                                 onClick = { 
-                                    if (currentIndex < routine.exercises.size - 1) viewModel.activeWorkoutExerciseIndex++ else onFinish() 
+                                    if (currentIndex < routine.exercises.size - 1) { viewModel.activeWorkoutExerciseIndex++; viewModel.saveDraftSoon() } else onFinish() 
                                 },
                                 modifier = Modifier.weight(1f),
                                 containerColor = AccentCyan
@@ -617,117 +650,112 @@ fun CardioTimerView(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TEMPORIZADOR DE DESCANSO — con vibración al llegar a 0
+// TEMPORIZADOR DE DESCANSO — la cuenta y el aviso viven en el ViewModel (RestTimer)
 // ═══════════════════════════════════════════════════════════════════════════════
-@Composable
-fun RestTimerDialog(viewModel: GymFlowViewModel, onDismiss: () -> Unit) {
-    val context   = LocalContext.current
-    val timeLeft  = viewModel.restTimerSeconds
-    val isRunning = viewModel.restTimerRunning
+private fun fmtRest(seconds: Int) = String.format(Locale.getDefault(), "%02d:%02d", seconds / 60, seconds % 60)
 
-    // Tick cada segundo
-    LaunchedEffect(isRunning, timeLeft) {
-        if (isRunning && timeLeft > 0) {
-            delay(1000L)
-            viewModel.restTimerSeconds--
-        } else if (isRunning && timeLeft <= 0) {
-            viewModel.restTimerRunning = false
-            // 📳 Vibración al terminar descanso
-            vibratePattern(context)
+/** Indicador compacto del descanso para la barra superior; al pulsarlo abre los controles. */
+@Composable
+fun RestChip(viewModel: GymFlowViewModel, onClick: () -> Unit) {
+    val status = viewModel.restStatus
+    if (status == RestTimer.Status.IDLE) return
+    val finished = status == RestTimer.Status.FINISHED
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (finished) AccentCyan else AccentCyan.copy(alpha = 0.14f),
+        modifier = Modifier.semantics { contentDescription = if (finished) "Descanso terminado" else "Descanso: ${viewModel.restSecondsLeft} segundos" }
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (status == RestTimer.Status.PAUSED) Icons.Default.Pause else Icons.Default.Timer, null,
+                tint = if (finished) OnAccent else AccentCyan, modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (finished) "¡Listo!" else fmtRest(viewModel.restSecondsLeft),
+                color = if (finished) OnAccent else AccentCyan, fontWeight = FontWeight.Bold, fontSize = 14.sp
+            )
         }
     }
+}
+
+@Composable
+fun RestTimerDialog(viewModel: GymFlowViewModel, onDismiss: () -> Unit) {
+    val status = viewModel.restStatus
+    val timeLeft = viewModel.restSecondsLeft
+    val running = status == RestTimer.Status.RUNNING
+    val finished = status == RestTimer.Status.FINISHED
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF0D1A1A),
+        containerColor = SurfaceDark,
         shape = RoundedCornerShape(28.dp),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Timer, null, tint = AccentCyan, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.rest_title), color = AccentWhite, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text(stringResource(R.string.rest_title), color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 20.sp)
             }
         },
         text = {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Spacer(Modifier.height(8.dp))
-
-                // Display grande del timer
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = String.format(Locale.getDefault(), "%02d:%02d", timeLeft / 60, timeLeft % 60),
-                    color = if (timeLeft <= 5 && isRunning) AccentRed else AccentCyan,
-                    fontSize = 56.sp,
-                    fontWeight = FontWeight.Black
+                    text = if (finished) "¡Descanso terminado!" else fmtRest(timeLeft),
+                    color = if (running && timeLeft <= 5) AccentRed else AccentCyan,
+                    fontSize = if (finished) 26.sp else 56.sp,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
                 )
-
+                Text("Duración: ${fmtRest(viewModel.defaultRestSeconds)}", color = TextSecondary, fontSize = 13.sp)
                 Spacer(Modifier.height(20.dp))
 
-                // Controles ±15s
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // -15s
-                    FilledTonalButton(
-                        onClick = { viewModel.restTimerSeconds = maxOf(0, timeLeft - 15) },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = Color(0xFF1A2A2A),
-                            contentColor = AccentCyan
-                        ),
+                if (status == RestTimer.Status.IDLE || finished) {
+                    Button(
+                        onClick = { viewModel.startRest() },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = OnAccent),
                         shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
                     ) {
-                        Text("-15s", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Icon(Icons.Default.PlayArrow, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Empezar descanso", fontWeight = FontWeight.Bold)
                     }
-
-                    Spacer(Modifier.width(16.dp))
-
-                    // Botón Play/Pause grande
-                    FilledIconButton(
-                        onClick = { viewModel.restTimerRunning = !isRunning },
-                        modifier = Modifier.size(56.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = if (isRunning) AccentRed else AccentCyan,
-                            contentColor = Color.Black
-                        )
-                    ) {
-                        Icon(
-                            if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            null,
-                            modifier = Modifier.size(28.dp)
-                        )
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                        FilledTonalButton(
+                            onClick = { viewModel.addRestSeconds(-15) },
+                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = SurfaceAlt, contentColor = AccentCyan),
+                            shape = RoundedCornerShape(14.dp), modifier = Modifier.heightIn(min = 48.dp)
+                        ) { Text("−15 s", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+                        Spacer(Modifier.width(14.dp))
+                        FilledIconButton(
+                            onClick = { if (running) viewModel.pauseRest() else viewModel.resumeRest() },
+                            modifier = Modifier.size(60.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = AccentCyan, contentColor = OnAccent)
+                        ) {
+                            Icon(if (running) Icons.Default.Pause else Icons.Default.PlayArrow, if (running) "Pausar" else "Reanudar", modifier = Modifier.size(30.dp))
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        FilledTonalButton(
+                            onClick = { viewModel.addRestSeconds(15) },
+                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = SurfaceAlt, contentColor = AccentCyan),
+                            shape = RoundedCornerShape(14.dp), modifier = Modifier.heightIn(min = 48.dp)
+                        ) { Text("+15 s", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
                     }
-
-                    Spacer(Modifier.width(16.dp))
-
-                    // +15s
-                    FilledTonalButton(
-                        onClick = { viewModel.restTimerSeconds = timeLeft + 15 },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = Color(0xFF1A2A2A),
-                            contentColor = AccentCyan
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Text("+15s", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                        TextButton(onClick = { viewModel.restartRest() }) {
+                            Icon(Icons.Default.Refresh, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.rest_reset), color = TextSecondary)
+                        }
+                        TextButton(onClick = { viewModel.cancelRest() }) {
+                            Icon(Icons.Default.Close, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Cancelar", color = TextSecondary)
+                        }
                     }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // Botón reset rápido
-                TextButton(onClick = {
-                    viewModel.restTimerSeconds = 60
-                    viewModel.restTimerRunning = false
-                }) {
-                    Icon(Icons.Default.Refresh, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.rest_reset), color = TextSecondary, fontSize = 13.sp)
                 }
             }
         },
@@ -843,7 +871,7 @@ fun WorkoutSummaryScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF152A2A)),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
                         border = BorderStroke(1.dp, AccentCyan.copy(alpha = 0.3f))
                     ) {
                         Row(
@@ -857,13 +885,13 @@ fun WorkoutSummaryScreen(
                                 Spacer(Modifier.height(4.dp))
                                 val bestDefn = ExerciseRepository.getCached().find { it.name == bestSet.first }
                                 Text(
-                                    bestDefn?.nameEs ?: bestSet.first,
+                                    ExerciseNamesEs.display(bestSet.first),
                                     color = AccentWhite,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 16.sp
                                 )
                                 Text(
-                                    "${bestSet.second} kg × ${bestSet.third} reps",
+                                    "${fmtKg(bestSet.second)} × ${bestSet.third} reps",
                                     color = TextSecondary,
                                     fontSize = 14.sp
                                 )
@@ -873,7 +901,7 @@ fun WorkoutSummaryScreen(
                 }
 
                 Spacer(Modifier.height(28.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                HorizontalDivider(color = TextPrimary.copy(alpha = 0.06f))
                 Spacer(Modifier.height(20.dp))
 
                 // Desglose por ejercicio
@@ -899,7 +927,7 @@ fun WorkoutSummaryScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             val defn = ExerciseRepository.getCached().find { it.name == exercise.exerciseName }
-                            Text(defn?.nameEs ?: exercise.exerciseName, color = AccentWhite, fontWeight = FontWeight.Bold)
+                            Text(ExerciseNamesEs.display(exercise.exerciseName), color = AccentWhite, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(8.dp))
                             completedSets.forEachIndexed { idx, set ->
                                 Row(
@@ -908,7 +936,7 @@ fun WorkoutSummaryScreen(
                                 ) {
                                     Text(stringResource(R.string.summary_set_n, idx + 1), color = TextSecondary, fontSize = 13.sp)
                                     Text(
-                                        "${set.weight} kg × ${set.repetitions}",
+                                        "${fmtKg(set.weight)} × ${set.repetitions}",
                                         color = TextPrimary,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold
@@ -971,7 +999,7 @@ fun SummaryStatCard(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A))
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -998,8 +1026,8 @@ private data class ConfettiParticle(
 @Composable
 fun ConfettiAnimation() {
     val confettiColors = listOf(
-        AccentCyan, Color(0xFF4CAF50), Color(0xFFFFD700),
-        Color(0xFFFF6B6B), Color(0xFFE040FB), AccentWhite
+        AccentCyan, Success, Gold,
+        AccentRed, Color(0xFFE040FB), AccentWhite
     )
     val particles = remember {
         List(80) {
@@ -1049,7 +1077,7 @@ fun SetTypePickerDialog(
 ) {
     val types = listOf(
         Triple(SetType.NORMAL,   stringResource(R.string.set_type_normal),   AccentCyan),
-        Triple(SetType.WARMUP,   stringResource(R.string.set_type_warmup),   Color(0xFF888888)),
+        Triple(SetType.WARMUP,   stringResource(R.string.set_type_warmup),   TextSecondary),
         Triple(SetType.DROP_SET, stringResource(R.string.set_type_dropset),  Color(0xFFFF6B35)),
         Triple(SetType.FAILURE,  stringResource(R.string.set_type_failure),  Color(0xFF9C27B0))
     )
@@ -1073,9 +1101,9 @@ fun SetTypePickerDialog(
                         modifier = Modifier.fillMaxWidth().clickable { onSelect(type) },
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) color.copy(alpha = 0.15f) else Color(0xFF0A0A0A)
+                            containerColor = if (isSelected) color.copy(alpha = 0.15f) else SurfaceDark
                         ),
-                        border = BorderStroke(1.dp, if (isSelected) color else Color(0xFF1A1A1A))
+                        border = BorderStroke(1.dp, if (isSelected) color else Border)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -1087,12 +1115,12 @@ fun SetTypePickerDialog(
                             ) {
                                 Text(
                                     when (type) {
-                                        SetType.WARMUP   -> "W"
+                                        SetType.WARMUP   -> "C"
                                         SetType.DROP_SET -> "D"
                                         SetType.FAILURE  -> "F"
                                         else             -> "N"
                                     },
-                                    color = Color.Black,
+                                    color = OnAccent,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp
                                 )

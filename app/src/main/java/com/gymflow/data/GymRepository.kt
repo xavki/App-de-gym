@@ -236,6 +236,8 @@ class GymRepository(private val db: GymDatabase) {
         dao.upsertWorkoutSets(setOut)
     }
 
+    suspend fun workoutExists(id: String): Boolean = dao.workoutIdCount(id) > 0
+
     /** Historial de un ejercicio concreto (pantalla de información). */
     suspend fun exerciseHistory(uid: String, exerciseName: String): List<ExerciseHistoryEntry> =
         workouts(uid).mapNotNull { w ->

@@ -46,58 +46,30 @@ fun ExerciseSelectionScreen(
     onExercisesSelected: (List<String>) -> Unit,
     onBack: () -> Unit,
     onInfoClick: (String) -> Unit,
-    onCreateCustom: ((CustomExercise) -> Unit)? = null
+    onCreateCustom: ((CustomExercise) -> Unit)? = null,
+    state: ExerciseSearchState = remember { ExerciseSearchState().apply { beginSelection(alreadySelected) } }
 ) {
-    val selected = remember { mutableStateListOf<String>().apply { addAll(alreadySelected) } }
-    var searchQuery by remember { mutableStateOf("") }
-    val selectedFilters = remember { mutableStateListOf<String>() }
-    var filtersExpanded by remember { mutableStateOf(false) }
+    // Estado guardado en el ViewModel: sobrevive a ir al detalle de un ejercicio y volver
+    val selected = state.selected
+    var searchQuery by state::query
+    val selectedFilters = state.filters
+    var filtersExpanded by state::filtersExpanded
     var showCreateDialog by remember { mutableStateOf(false) }
-    
+
     // Lista fija de categorías (traducidas al español)
     val categories = listOf(
-        "Cardio", "Fuerza", "Abdominales", "Abductores", "Aductores", 
-        "Antebrazo", "Bíceps", "Cuello", "Cuádriceps", "Dorsales", 
-        "Espalda Baja", "Espalda Media", "Gemelos", "Glúteos", 
+        "Cardio", "Fuerza", "Abdominales", "Abductores", "Aductores",
+        "Antebrazo", "Bíceps", "Cuello", "Cuádriceps", "Dorsales",
+        "Espalda Baja", "Espalda Media", "Gemelos", "Glúteos",
         "Hombros", "Isquiotibiales", "Pecho", "Trapecios", "Tríceps"
     )
 
-    val filtered = exercises.filter { ex ->
-        val matchesSearch = ex.name.contains(searchQuery, ignoreCase = true) ||
-                (ex.nameEs?.contains(searchQuery, ignoreCase = true) == true)
-        
-        val matchesFilter = if (selectedFilters.isEmpty()) {
-            true
-        } else {
-            // Mapeo manual para asegurar que los filtros funcionan con los datos de Firestore
-            val exCategories = (ex.mainGroup.split(",") + ex.musclesUsed.split(","))
-                .map { it.trim().lowercase() }
-            
-            selectedFilters.any { filter -> 
-                val fLower = filter.lowercase()
-                exCategories.any { it.contains(fLower) } || 
-                (fLower == "fuerza" && exCategories.any { it.contains("strength") }) ||
-                (fLower == "pecho" && exCategories.any { it.contains("chest") }) ||
-                (fLower == "bíceps" && exCategories.any { it.contains("biceps") }) ||
-                (fLower == "tríceps" && exCategories.any { it.contains("triceps") }) ||
-                (fLower == "hombros" && exCategories.any { it.contains("shoulders") }) ||
-                (fLower == "gemelos" && exCategories.any { it.contains("calves") }) ||
-                (fLower == "glúteos" && exCategories.any { it.contains("glutes") }) ||
-                (fLower == "dorsales" && exCategories.any { it.contains("lats") }) ||
-                (fLower == "cuádriceps" && exCategories.any { it.contains("quads") }) ||
-                (fLower == "isquiotibiales" && exCategories.any { it.contains("hamstrings") }) ||
-                (fLower == "abdominales" && exCategories.any { it.contains("abs") }) ||
-                (fLower == "abductores" && exCategories.any { it.contains("abductor") }) ||
-                (fLower == "aductores" && exCategories.any { it.contains("adductor") }) ||
-                (fLower == "antebrazo" && exCategories.any { it.contains("forearm") }) ||
-                (fLower == "cuello" && exCategories.any { it.contains("neck") }) ||
-                (fLower == "trapecios" && exCategories.any { it.contains("trap") }) ||
-                (fLower == "espalda baja" && exCategories.any { it.contains("lower back") }) ||
-                (fLower == "espalda media" && exCategories.any { it.contains("mid back") || it.contains("middle back") })
-            }
-        }
-        
-        matchesSearch && matchesFilter
+    // Solo se recalcula cuando cambian el catálogo, el texto o los filtros (no en cada recomposición).
+    // Busca en español y en el nombre original en inglés, sin distinguir tildes.
+    val filterKey = selectedFilters.toList()
+    val filtered = remember(exercises, searchQuery, filterKey) {
+        exercises.filter { it.matchesQuery(searchQuery) && it.matchesFilters(filterKey) }
+            .sortedBy { normalizeForSearch(it.displayName()) }
     }
 
     Scaffold(
@@ -146,12 +118,12 @@ fun ExerciseSelectionScreen(
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = AccentCyan,
-                            unfocusedBorderColor = Color(0xFF2A2A2A),
+                            unfocusedBorderColor = Border,
                             cursorColor = AccentCyan,
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedContainerColor = Color(0xFF0A0A0A),
-                            unfocusedContainerColor = Color(0xFF0A0A0A)
+                            focusedContainerColor = SurfaceDark,
+                            unfocusedContainerColor = SurfaceDark
                         )
                     )
                     
@@ -164,7 +136,7 @@ fun ExerciseSelectionScreen(
                             modifier = Modifier.size(52.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = if (filtersExpanded) AccentCyan.copy(alpha = 0.2f) else Color(0xFF1A1A1A)
+                                containerColor = if (filtersExpanded) AccentCyan.copy(alpha = 0.2f) else Border
                             )
                         ) {
                             Icon(
@@ -184,7 +156,7 @@ fun ExerciseSelectionScreen(
                             ) {
                                 Text(
                                     "${selectedFilters.size}",
-                                    color = Color.Black,
+                                    color = OnAccent,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black
                                 )
@@ -202,8 +174,8 @@ fun ExerciseSelectionScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D0D0D)),
-                        border = BorderStroke(1.dp, Color(0xFF1A1A1A))
+                        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                        border = BorderStroke(1.dp, Border)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             // Cabecera
@@ -282,7 +254,7 @@ fun ExerciseSelectionScreen(
                     CircularProgressIndicator(color = AccentCyan)
                 }
             } else {
-                LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
+                LazyColumn(state = state.listState, modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
                     items(filtered) { ex ->
                         val isSel = selected.contains(ex.name)
                         Card(
@@ -293,7 +265,7 @@ fun ExerciseSelectionScreen(
                                 }
                                 .padding(vertical = 4.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = if (isSel) Color(0xFF152A2A) else SurfaceDark),
+                            colors = CardDefaults.cardColors(containerColor = if (isSel) SurfaceAlt else SurfaceDark),
                             border = if (isSel) BorderStroke(1.dp, AccentCyan.copy(0.5f)) else null
                         ) {
                             Row(
@@ -307,7 +279,7 @@ fun ExerciseSelectionScreen(
                                 Spacer(Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = ex.nameEs ?: ex.name,
+                                        text = ex.displayName(),
                                         color = TextPrimary,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -357,7 +329,7 @@ fun ExerciseDetailScreen(exercise: WorkoutExercise, onBack: () -> Unit, onInfoCl
         containerColor = BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text(exercise.exerciseName, color = AccentWhite, fontWeight = FontWeight.Bold) },
+                title = { Text(ExerciseNamesEs.display(exercise.exerciseName), color = AccentWhite, fontWeight = FontWeight.Bold) },
                 navigationIcon = { 
                     IconButton(onClick = onBack) { 
                         Icon(Icons.Default.ArrowBack, null, tint = AccentWhite) 
@@ -390,10 +362,10 @@ fun ExerciseDetailScreen(exercise: WorkoutExercise, onBack: () -> Unit, onInfoCl
                             InfoChip(label = diff, color = AccentCyan)
                         }
                         definition.equipment?.let { equip ->
-                            InfoChip(label = equip, color = Color(0xFF8E8E93))
+                            InfoChip(label = equip, color = TextSecondary)
                         }
                         definition.subCategory?.let { sub ->
-                            InfoChip(label = sub, color = Color(0xFF3A3A3C))
+                            InfoChip(label = sub, color = BorderStrong)
                         }
                     }
 
@@ -434,12 +406,13 @@ fun ExerciseDetailScreen(exercise: WorkoutExercise, onBack: () -> Unit, onInfoCl
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Text(
-                            text = definition.instructionsEs ?: definition.instructions,
+                            text = definition.displayInstructions(),
                             color = TextPrimary,
                             fontSize = 14.sp,
                             modifier = Modifier.padding(16.dp),
                             lineHeight = 22.sp
                         )
+                        InstructionsReviewNote(definition, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp))
                     }
                     Spacer(Modifier.height(24.dp))
                 }
@@ -478,7 +451,7 @@ fun ExerciseDetailScreen(exercise: WorkoutExercise, onBack: () -> Unit, onInfoCl
                             modifier = Modifier.size(28.dp).background(AccentCyan, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("${index + 1}", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("${index + 1}", color = OnAccent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                         
                         Spacer(Modifier.width(16.dp))
@@ -495,7 +468,7 @@ fun ExerciseDetailScreen(exercise: WorkoutExercise, onBack: () -> Unit, onInfoCl
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = AccentCyan,
-                                unfocusedBorderColor = Color.DarkGray,
+                                unfocusedBorderColor = BorderStrong,
                                 cursorColor = AccentCyan,
                                 focusedTextColor = TextPrimary,
                                 unfocusedTextColor = TextPrimary,
@@ -518,7 +491,7 @@ fun ExerciseDetailScreen(exercise: WorkoutExercise, onBack: () -> Unit, onInfoCl
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = AccentCyan,
-                                unfocusedBorderColor = Color.DarkGray,
+                                unfocusedBorderColor = BorderStrong,
                                 cursorColor = AccentCyan,
                                 focusedTextColor = TextPrimary,
                                 unfocusedTextColor = TextPrimary,
@@ -573,14 +546,15 @@ fun ExerciseInfoScreen(exerciseName: String, onBack: () -> Unit) {
                     modifier = Modifier.padding(vertical = 16.dp)
                 )
                 
-                Text(exerciseName, color = AccentCyan, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                Text(ExerciseNamesEs.display(exerciseName), color = AccentCyan, fontSize = 28.sp, fontWeight = FontWeight.Black)
                 if (definition != null) {
                     Spacer(Modifier.height(8.dp))
                     Text(definition.mainGroup, color = TextSecondary, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(24.dp))
                     Text("INSTRUCCIONES", color = AccentWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
-                    Text(definition.instructionsEs ?: definition.instructions, color = TextPrimary, lineHeight = 22.sp)
+                    Text(definition.displayInstructions(), color = TextPrimary, lineHeight = 22.sp)
+                    InstructionsReviewNote(definition, Modifier.padding(top = 8.dp))
                 }
                 
                 Spacer(Modifier.height(40.dp))
@@ -672,19 +646,19 @@ fun FilterGroup(
                         }
                     } else null,
                     colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Color(0xFF151515),
+                        containerColor = SurfaceAlt,
                         labelColor = TextSecondary,
                         selectedContainerColor = AccentCyan.copy(alpha = 0.15f),
                         selectedLabelColor = AccentCyan
                     ),
                     border = FilterChipDefaults.filterChipBorder(
-                        borderColor = Color(0xFF252525),
+                        borderColor = Border,
                         selectedBorderColor = AccentCyan.copy(alpha = 0.5f),
                         borderWidth = 1.dp,
                         selectedBorderWidth = 1.dp,
                         enabled = true,
                         selected = isSelected,
-                        disabledBorderColor = Color.DarkGray.copy(alpha = 0.3f),
+                        disabledBorderColor = BorderStrong.copy(alpha = 0.3f),
                         disabledSelectedBorderColor = AccentCyan.copy(alpha = 0.3f)
                     ),
                     shape = RoundedCornerShape(10.dp)
@@ -756,7 +730,7 @@ fun CreateExerciseDialog(
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         androidx.compose.material3.Surface(
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFF0D1A1A)
+            color = SurfaceDark
         ) {
             androidx.compose.foundation.lazy.LazyColumn(
                 modifier = Modifier.padding(24.dp),
@@ -774,7 +748,7 @@ fun CreateExerciseDialog(
                         )
                     }
                     Spacer(Modifier.height(4.dp))
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                    HorizontalDivider(color = TextPrimary.copy(alpha = 0.06f))
                 }
 
                 item {
@@ -863,7 +837,7 @@ fun CreateExerciseDialog(
                             onClick = onDismiss,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(14.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderStrong)
                         ) { Text(stringResource(R.string.schedule_cancel), color = TextSecondary) }
 
                         Button(
@@ -881,7 +855,7 @@ fun CreateExerciseDialog(
                             modifier = Modifier.weight(1f),
                             enabled = name.isNotBlank(),
                             shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = Color.Black)
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = OnAccent)
                         ) { Text(stringResource(R.string.schedule_save), fontWeight = FontWeight.Bold) }
                     }
                 }
@@ -893,10 +867,23 @@ fun CreateExerciseDialog(
 @Composable
 private fun customExFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = AccentCyan,
-    unfocusedBorderColor = Color(0xFF1A2A2A),
+    unfocusedBorderColor = SurfaceAlt,
     focusedTextColor = TextPrimary,
     unfocusedTextColor = TextPrimary,
     focusedLabelColor = AccentCyan,
     unfocusedLabelColor = TextSecondary,
     cursorColor = AccentCyan
 )
+
+/** Instrucción del original dudosa o con posible riesgo: se avisa de que no es una recomendación validada. */
+@Composable
+private fun InstructionsReviewNote(definition: ExerciseDefinition, modifier: Modifier = Modifier) {
+    val note = definition.instructionsReviewNote() ?: return
+    Text(
+        text = "Pendiente de revisión: $note",
+        color = AccentRed,
+        fontSize = 12.sp,
+        lineHeight = 17.sp,
+        modifier = modifier
+    )
+}

@@ -20,6 +20,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -30,6 +31,11 @@
         <!-- Receiver para alarmas de notificación -->
         <receiver
             android:name=".NotificationReceiver"
+            android:exported="false"/>
+
+        <!-- Fin del descanso con la app en segundo plano -->
+        <receiver
+            android:name=".RestAlarmReceiver"
             android:exported="false"/>
 
         <!-- Receiver para reprogramar alarmas tras reinicio -->

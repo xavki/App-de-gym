@@ -1,5 +1,10 @@
 package com.gymflow
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,7 +54,14 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.launch
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+/** Secciones principales. Nutrición no existe en Android (solo en el panel web). */
+private enum class MainTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    HOME("Inicio", Icons.Default.Home),
+    TRAIN("Entrenar", Icons.Default.FitnessCenter),
+    PROGRESS("Progreso", Icons.Default.ShowChart),
+    PROFILE("Perfil", Icons.Default.Person),
+}
+
 @Composable
 fun HomeScreen(
     viewModel: GymFlowViewModel,
@@ -58,66 +70,64 @@ fun HomeScreen(
     onContinueWorkout: () -> Unit,
     onDeleteRoutine: (WorkoutSession) -> Unit,
     onCopyRoutine: (WorkoutSession) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onExerciseProgress: (String) -> Unit = {}
 ) {
-    // 0 = Calendario, 1 = Rutinas, 2 = Perfil
-    val pagerState  = rememberPagerState(initialPage = 1) { 3 }
-    val scope       = rememberCoroutineScope()
-    val currentPage = pagerState.currentPage
+    // Pestaña actual guardada: se conserva al volver de una rutina, un entreno o al girar la pantalla
+    var tab by rememberSaveable { mutableStateOf(MainTab.HOME) }
+    var showCalendar by rememberSaveable { mutableStateOf(false) }
+    var showPRBoard by rememberSaveable { mutableStateOf(false) }
+    // Atrás cierra calendario/récords; desde otra pestaña vuelve a Inicio antes de salir de la app
+    BackHandler(enabled = showCalendar || showPRBoard || tab != MainTab.HOME) {
+        if (showCalendar || showPRBoard) { showCalendar = false; showPRBoard = false } else tab = MainTab.HOME
+    }
 
     Scaffold(
         containerColor = BackgroundDark,
         bottomBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SurfaceDark)
-                    .padding(vertical = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    GlowNavItem(
-                        icon = Icons.Default.CalendarMonth,
-                        label = stringResource(R.string.nav_calendar),
-                        selected = currentPage == 0,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(0) } }
-                    )
-                    GlowNavItem(
-                        icon = Icons.Default.FitnessCenter,
-                        label = stringResource(R.string.nav_routines),
-                        selected = currentPage == 1,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(1) } }
-                    )
-                    GlowNavItem(
-                        icon = Icons.Default.Person,
-                        label = stringResource(R.string.nav_profile),
-                        selected = currentPage == 2,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(2) } }
+            // NavigationBar ya aplica el inset de la barra de navegación del sistema (gestos o 3 botones)
+            NavigationBar(containerColor = SurfaceDark, tonalElevation = 0.dp) {
+                MainTab.entries.forEach { t ->
+                    NavigationBarItem(
+                        selected = tab == t,
+                        onClick = { tab = t; showCalendar = false; showPRBoard = false },
+                        icon = { Icon(t.icon, contentDescription = null) },
+                        label = { Text(t.label, fontWeight = if (tab == t) FontWeight.Bold else FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = AccentCyan, selectedTextColor = AccentCyan,
+                            indicatorColor = AccentCyan.copy(alpha = 0.14f),
+                            unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary
+                        )
                     )
                 }
             }
         },
         floatingActionButton = {
-            if (currentPage == 1) {
-                FloatingActionButton(onClick = onCreateRoutine, containerColor = AccentWhite) {
-                    Icon(Icons.Default.Add, null)
-                }
+            if (tab == MainTab.TRAIN) {
+                ExtendedFloatingActionButton(
+                    onClick = onCreateRoutine, containerColor = AccentCyan, contentColor = OnAccent,
+                    icon = { Icon(Icons.Default.Add, null) }, text = { Text("Nueva rutina", fontWeight = FontWeight.Bold) }
+                )
             }
         }
     ) { padding ->
-        HorizontalPager(
-            state    = pagerState,
-            modifier = Modifier.padding(padding).fillMaxSize()
-        ) { page ->
-            when (page) {
-                0 -> CalendarScreen(
+        // El Scaffold ya descuenta la barra de estado y la inferior: sin paddings duplicados
+        Box(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
+            when {
+                showPRBoard -> PRBoardScreen(viewModel = viewModel, onBack = { showPRBoard = false })
+                showCalendar -> Column(Modifier.fillMaxSize()) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { showCalendar = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver al perfil", tint = TextPrimary) }
+                    }
+                    CalendarScreen(viewModel = viewModel, routines = viewModel.routines)
+                }
+                tab == MainTab.HOME -> HomeTab(
                     viewModel = viewModel,
-                    routines  = viewModel.routines
+                    onContinueWorkout = onContinueWorkout,
+                    onGoTrain = { tab = MainTab.TRAIN },
+                    onGoProgress = { tab = MainTab.PROGRESS }
                 )
-                1 -> RoutinesTab(
+                tab == MainTab.TRAIN -> RoutinesTab(
                     viewModel.routines,
                     viewModel.activeWorkout,
                     viewModel.totalSeconds,
@@ -128,12 +138,17 @@ fun HomeScreen(
                     onCopyRoutine,
                     onCreateFromTemplate = { name -> viewModel.createFromTemplate(name) }
                 )
-                2 -> ProfileScreen(
+                tab == MainTab.PROGRESS -> ProgressTab(
+                    viewModel = viewModel,
+                    onOpenPRBoard = { showPRBoard = true },
+                    onExerciseProgress = onExerciseProgress
+                )
+                else -> ProfileScreen(
                     viewModel = viewModel,
                     history   = viewModel.workoutHistory,
                     isLoading = viewModel.isLoadingHistory,
                     onLogout  = onLogout,
-                    onNavigateToPRBoard = { /* handled via onNavigate */ }
+                    onOpenCalendar = { showCalendar = true }
                 )
             }
         }
@@ -200,7 +215,7 @@ fun RoutinesTab(
                             Brush.horizontalGradient(
                                 colors = listOf(
                                     AccentCyan.copy(alpha = pulseAlpha),
-                                    Color(0xFF1B8A80).copy(alpha = pulseAlpha)
+                                    AccentTeal.copy(alpha = pulseAlpha)
                                 )
                             ),
                             RoundedCornerShape(24.dp)
@@ -210,20 +225,20 @@ fun RoutinesTab(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.routines_active),
-                                color = Color.Black.copy(alpha = 0.6f),
+                                color = OnAccent.copy(alpha = 0.6f),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 1.sp
                             )
                             Spacer(Modifier.height(4.dp))
-                            Text(activeWorkout.name, color = Color.Black, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text(activeWorkout.name, color = OnAccent, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 String.format("%02d:%02d", (totalSeconds % 3600) / 60, totalSeconds % 60),
-                                fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.Black
+                                fontSize = 28.sp, fontWeight = FontWeight.Black, color = OnAccent
                             )
-                            Text(stringResource(R.string.routines_duration), color = Color.Black.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.routines_duration), color = OnAccent.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -318,13 +333,12 @@ fun ProfileScreen(
     history: List<WorkoutSession>,
     isLoading: Boolean,
     onLogout: () -> Unit,
-    onNavigateToPRBoard: (() -> Unit)? = null
+    onOpenCalendar: () -> Unit = {}
 ) {
     val user = FirebaseAuth.getInstance().currentUser
     val context = LocalContext.current
     var showSettings by remember { mutableStateOf(false) }
     var showBodyMeasurements by remember { mutableStateOf(false) }
-    var showPRBoard by remember { mutableStateOf(false) }
 
     // Estadísticas rápidas
     val totalWorkouts = history.size
@@ -351,14 +365,6 @@ fun ProfileScreen(
         return
     }
 
-    // PR Board (overlay)
-    if (showPRBoard) {
-        PRBoardScreen(
-            viewModel = viewModel,
-            onBack = { showPRBoard = false }
-        )
-        return
-    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
@@ -375,7 +381,7 @@ fun ProfileScreen(
                         .size(72.dp)
                         .clip(CircleShape)
                         .background(
-                            Brush.linearGradient(listOf(AccentCyan, Color(0xFF1B8A80)))
+                            Brush.linearGradient(listOf(AccentCyan, AccentTeal))
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -385,7 +391,7 @@ fun ProfileScreen(
                         .joinToString("") { it.firstOrNull()?.uppercase() ?: "" }
                     Text(
                         initials,
-                        color      = Color.Black,
+                        color      = OnAccent,
                         fontSize   = 26.sp,
                         fontWeight = FontWeight.Black
                     )
@@ -421,64 +427,20 @@ fun ProfileScreen(
             Spacer(Modifier.height(28.dp))
         }
 
-        // ── Cards de estadísticas ───────────────────────────────────────────
+        // ── Calendario (antes en la barra de navegación) ────────────────────
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(
-                    icon     = Icons.Default.FitnessCenter,
-                    value    = "$totalWorkouts",
-                    label    = stringResource(R.string.profile_workouts),
-                    modifier = Modifier.weight(1f)
-                )
-                StatCard(
-                    icon     = Icons.Default.Timer,
-                    value    = "${totalMinutes}m",
-                    label    = stringResource(R.string.profile_minutes),
-                    modifier = Modifier.weight(1f)
-                )
-                StatCard(
-                    icon     = Icons.Default.Repeat,
-                    value    = "$totalSets",
-                    label    = stringResource(R.string.profile_total_sets),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Botón PR Board
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF1A0A00)
-                ),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth().clickable { showPRBoard = true }
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🏆", fontSize = 22.sp)
+            AppCard(onClick = onOpenCalendar) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CalendarMonth, null, tint = AccentCyan)
                     Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.pr_board_title), color = AccentWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("Tus mejores levantamientos", color = TextSecondary, fontSize = 11.sp)
+                    Column(Modifier.weight(1f)) {
+                        Text("Calendario", color = TextPrimary, fontWeight = FontWeight.Bold)
+                        Text("Programa rutinas y recordatorios", color = TextSecondary, fontSize = 13.sp)
                     }
                     Icon(Icons.Default.ChevronRight, null, tint = TextSecondary)
                 }
             }
-
-            Spacer(Modifier.height(32.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
-            Spacer(Modifier.height(24.dp))
-        }
-
-        // ── Gráfica de progreso ──────────────────────────────────────────────
-        item {
-            WorkoutProgressChart(history = history)
-            Spacer(Modifier.height(24.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(12.dp))
         }
 
         // ── Racha + Botón Medidas ───────────────────────────────────────────
@@ -487,7 +449,7 @@ fun ProfileScreen(
                 // Card Racha
                 val streak = viewModel.workoutStreak
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A08)),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.weight(1f)
                 ) {
@@ -500,7 +462,7 @@ fun ProfileScreen(
                         Text(
                             if (streak > 0) "$streak"
                             else "0",
-                            color = if (streak > 0) Color(0xFFFFD700) else TextSecondary,
+                            color = if (streak > 0) Gold else TextSecondary,
                             fontWeight = FontWeight.Black,
                             fontSize = 26.sp
                         )
@@ -515,7 +477,7 @@ fun ProfileScreen(
                 }
                 // Botón Medidas corporales
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A)),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.weight(1f).clickable { showBodyMeasurements = true }
                 ) {
@@ -526,7 +488,7 @@ fun ProfileScreen(
                         Text("⚖️", fontSize = 22.sp)
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            viewModel.bodyMeasurements.lastOrNull()?.let { "${it.weight} kg" } ?: "—",
+                            viewModel.bodyMeasurements.lastOrNull()?.let { fmtKg(it.weight) } ?: "—",
                             color = AccentCyan,
                             fontWeight = FontWeight.Black,
                             fontSize = 22.sp
@@ -542,14 +504,6 @@ fun ProfileScreen(
                     }
                 }
             }
-            Spacer(Modifier.height(24.dp))
-        }
-
-        // ── Mapa muscular ────────────────────────────────────────────────────
-        item {
-            MuscleMapCard(history = history)
-            Spacer(Modifier.height(24.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
             Spacer(Modifier.height(24.dp))
         }
 
@@ -572,7 +526,7 @@ fun ProfileScreen(
                         val unlocked = ach.unlockedAt != null
                         Card(
                             colors = CardDefaults.cardColors(
-                                containerColor = if (unlocked) Color(0xFF0D1A1A) else Color(0xFF0A0A0A)
+                                containerColor = if (unlocked) SurfaceDark else SurfaceDark
                             ),
                             shape = RoundedCornerShape(14.dp),
                             border = if (unlocked) BorderStroke(1.dp, AccentCyan.copy(alpha = 0.3f)) else null,
@@ -606,7 +560,7 @@ fun ProfileScreen(
                 Spacer(Modifier.height(8.dp))
             }
             Spacer(Modifier.height(24.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+            HorizontalDivider(color = TextPrimary.copy(alpha = 0.06f))
             Spacer(Modifier.height(24.dp))
         }
 
@@ -744,7 +698,7 @@ fun StatCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        colors   = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A)),
+        colors   = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape    = RoundedCornerShape(18.dp),
         modifier = modifier
     ) {
@@ -794,7 +748,7 @@ fun WorkoutHistoryCard(session: WorkoutSession) {
             session.exercises.forEach { exercise ->
                 Column(modifier = Modifier.padding(vertical = 4.dp)) {
                     Text(
-                        exercise.exerciseName,
+                        ExerciseNamesEs.display(exercise.exerciseName),
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
@@ -805,7 +759,7 @@ fun WorkoutHistoryCard(session: WorkoutSession) {
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("S${index + 1}", color = TextSecondary, fontSize = 12.sp)
-                            Text("${set.weight} kg x ${set.repetitions}", color = TextPrimary, fontSize = 12.sp)
+                            Text("${fmtKg(set.weight)} × ${set.repetitions}", color = TextPrimary, fontSize = 12.sp)
                         }
                     }
                     if (exercise.sets.none { it.isCompleted }) {
@@ -815,7 +769,7 @@ fun WorkoutHistoryCard(session: WorkoutSession) {
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text("S${index + 1}", color = TextSecondary, fontSize = 12.sp)
-                                Text("${set.weight} kg x ${set.repetitions}", color = TextPrimary, fontSize = 12.sp)
+                                Text("${fmtKg(set.weight)} × ${set.repetitions}", color = TextPrimary, fontSize = 12.sp)
                             }
                         }
                     }
@@ -903,7 +857,7 @@ fun WorkoutProgressChart(history: List<WorkoutSession>) {
 
         // Card contenedora
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A)),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
             shape  = RoundedCornerShape(20.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -913,7 +867,7 @@ fun WorkoutProgressChart(history: List<WorkoutSession>) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF0A1010), RoundedCornerShape(12.dp))
+                        .background(SurfaceAlt, RoundedCornerShape(12.dp))
                         .padding(4.dp)
                 ) {
                     tabs.forEachIndexed { index, label ->
@@ -977,6 +931,7 @@ fun WorkoutProgressChart(history: List<WorkoutSession>) {
 
 @Composable
 fun BarChartWeekly(values: List<Int>, labels: List<String>) {
+    val pal = LocalPalette.current
     val maxVal = (values.maxOrNull() ?: 1).coerceAtLeast(1).toFloat()
     val barColor = AccentCyan
     val density  = LocalDensity.current
@@ -994,7 +949,7 @@ fun BarChartWeekly(values: List<Int>, labels: List<String>) {
 
     val labelTextPaint = remember {
         android.graphics.Paint().apply {
-            color     = TextSecondary.copy(alpha = 0.7f).toArgb()
+            color     = pal.textSecondary.copy(alpha = 0.7f).toArgb()
             textSize  = with(density) { 9.sp.toPx() }
             textAlign = android.graphics.Paint.Align.CENTER
             isAntiAlias = true
@@ -1002,7 +957,7 @@ fun BarChartWeekly(values: List<Int>, labels: List<String>) {
     }
     val valuePaint = remember {
         android.graphics.Paint().apply {
-            color     = AccentWhite.toArgb()
+            color     = pal.textPrimary.toArgb()
             textSize  = with(density) { 10.sp.toPx() }
             textAlign = android.graphics.Paint.Align.CENTER
             isFakeBoldText = true
@@ -1035,7 +990,7 @@ fun BarChartWeekly(values: List<Int>, labels: List<String>) {
 
             // Fondo de barra (guía)
             drawRoundRect(
-                color        = Color.White.copy(alpha = 0.04f),
+                color        = pal.textPrimary.copy(alpha = 0.04f),
                 topLeft      = Offset(left, 0f),
                 size         = Size(barW, chartHeight),
                 cornerRadius = CornerRadius(cornerR)
@@ -1047,8 +1002,8 @@ fun BarChartWeekly(values: List<Int>, labels: List<String>) {
                 drawRoundRect(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            if (isSelected) AccentCyan else AccentCyan.copy(alpha = 0.85f),
-                            AccentCyan.copy(alpha = 0.3f)
+                            if (isSelected) pal.accent else pal.accent.copy(alpha = 0.85f),
+                            pal.accent.copy(alpha = 0.3f)
                         ),
                         startY = top,
                         endY   = chartHeight
@@ -1080,7 +1035,7 @@ fun BarChartWeekly(values: List<Int>, labels: List<String>) {
 
         // Línea base
         drawLine(
-            color       = Color.White.copy(alpha = 0.08f),
+            color       = pal.textPrimary.copy(alpha = 0.08f),
             start       = Offset(0f, chartHeight),
             end         = Offset(size.width, chartHeight),
             strokeWidth = 1.dp.toPx()
@@ -1099,6 +1054,7 @@ fun BarChartWeekly(values: List<Int>, labels: List<String>) {
 
 @Composable
 fun LineChartVolume(values: List<Float>, labels: List<String>) {
+    val pal = LocalPalette.current
     val maxVal = (values.maxOrNull() ?: 1f).coerceAtLeast(1f)
     val density = LocalDensity.current
 
@@ -1113,7 +1069,7 @@ fun LineChartVolume(values: List<Float>, labels: List<String>) {
 
     val labelPaint = remember {
         android.graphics.Paint().apply {
-            color     = TextSecondary.copy(alpha = 0.7f).toArgb()
+            color     = pal.textSecondary.copy(alpha = 0.7f).toArgb()
             textSize  = with(density) { 9.sp.toPx() }
             textAlign = android.graphics.Paint.Align.CENTER
             isAntiAlias = true
@@ -1121,7 +1077,7 @@ fun LineChartVolume(values: List<Float>, labels: List<String>) {
     }
     val tooltipPaint = remember {
         android.graphics.Paint().apply {
-            color     = AccentWhite.toArgb()
+            color     = pal.textPrimary.toArgb()
             textSize  = with(density) { 10.sp.toPx() }
             textAlign = android.graphics.Paint.Align.CENTER
             isFakeBoldText = true
@@ -1160,7 +1116,7 @@ fun LineChartVolume(values: List<Float>, labels: List<String>) {
         drawPath(
             path  = fillPath,
             brush = Brush.verticalGradient(
-                colors = listOf(AccentCyan.copy(alpha = 0.22f), Color.Transparent),
+                colors = listOf(pal.accent.copy(alpha = 0.22f), Color.Transparent),
                 startY = 0f,
                 endY   = chartH
             )
@@ -1174,7 +1130,7 @@ fun LineChartVolume(values: List<Float>, labels: List<String>) {
         }
         drawPath(
             path   = linePath,
-            brush  = Brush.horizontalGradient(listOf(AccentCyan.copy(alpha = 0.5f), AccentCyan)),
+            brush  = Brush.horizontalGradient(listOf(pal.accent.copy(alpha = 0.5f), pal.accent)),
             style  = Stroke(
                 width     = lineW,
                 cap       = StrokeCap.Round,
@@ -1187,7 +1143,7 @@ fun LineChartVolume(values: List<Float>, labels: List<String>) {
         if (avg > 0f) {
             val yAvg = yOf(avg)
             drawLine(
-                color       = AccentCyan.copy(alpha = 0.15f),
+                color       = pal.accent.copy(alpha = 0.15f),
                 start       = Offset(0f, yAvg),
                 end         = Offset(size.width, yAvg),
                 strokeWidth = 1.dp.toPx(),
@@ -1205,20 +1161,20 @@ fun LineChartVolume(values: List<Float>, labels: List<String>) {
                 // Halo en seleccionado
                 if (isSelected) {
                     drawCircle(
-                        color  = AccentCyan.copy(alpha = 0.25f),
+                        color  = pal.accent.copy(alpha = 0.25f),
                         radius = dotR * 2.8f,
                         center = Offset(cx, cy)
                     )
                 }
                 // Punto relleno
                 drawCircle(
-                    color  = AccentCyan,
+                    color  = pal.accent,
                     radius = if (isSelected) dotR * 1.5f else dotR,
                     center = Offset(cx, cy)
                 )
                 // Punto interior
                 drawCircle(
-                    color  = Color(0xFF0D1A1A),
+                    color  = pal.surface,
                     radius = if (isSelected) dotR * 0.7f else dotR * 0.5f,
                     center = Offset(cx, cy)
                 )
@@ -1246,7 +1202,7 @@ fun LineChartVolume(values: List<Float>, labels: List<String>) {
 
         // Línea base
         drawLine(
-            color       = Color.White.copy(alpha = 0.08f),
+            color       = pal.textPrimary.copy(alpha = 0.08f),
             start       = Offset(0f, chartH),
             end         = Offset(size.width, chartH),
             strokeWidth = 1.dp.toPx()
@@ -1343,48 +1299,30 @@ fun SettingsDialog(
         },
         text = {
             Column {
-                HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                HorizontalDivider(color = TextPrimary.copy(alpha = 0.06f))
                 Spacer(Modifier.height(16.dp))
 
-                Text(
-                    stringResource(R.string.settings_language),
-                    color = TextSecondary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp
-                )
-                Spacer(Modifier.height(12.dp))
-
-                // Español
-                LanguageOption(
-                    flag = "🇪🇸",
-                    name = "Español",
-                    isSelected = currentLang == "es",
-                    onClick = {
-                        if (currentLang != "es") {
-                            prefs.edit().putString("app_language", "es").apply()
-                            updateLocale(context, "es")
-                        }
-                    }
-                )
-
+                // ── Tema ────────────────────────────────────────────────────
+                Text("APARIENCIA", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                 Spacer(Modifier.height(8.dp))
-
-                // English
-                LanguageOption(
-                    flag = "🇬🇧",
-                    name = "English",
-                    isSelected = currentLang == "en",
-                    onClick = {
-                        if (currentLang != "en") {
-                            prefs.edit().putString("app_language", "en").apply()
-                            updateLocale(context, "en")
-                        }
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { viewModel.darkTheme = !viewModel.darkTheme },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(if (viewModel.darkTheme) Icons.Default.DarkMode else Icons.Default.LightMode, null, tint = AccentCyan)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Tema oscuro", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Por defecto, claro", color = TextSecondary, fontSize = 12.sp)
                     }
-                )
+                    Switch(
+                        checked = viewModel.darkTheme, onCheckedChange = { viewModel.darkTheme = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = OnAccent, checkedTrackColor = AccentCyan)
+                    )
+                }
 
-                Spacer(Modifier.height(20.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = TextPrimary.copy(alpha = 0.06f))
                 Spacer(Modifier.height(16.dp))
 
                 // ── SECCIÓN: Timer de descanso automático ───────────────────
@@ -1398,39 +1336,39 @@ fun SettingsDialog(
                 Spacer(Modifier.height(12.dp))
 
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A)),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Timer automático", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Descanso automático", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Text("Iniciar descanso al completar serie", color = TextSecondary, fontSize = 11.sp)
                             }
                             Switch(
                                 checked = viewModel.autoRestTimer,
                                 onCheckedChange = { viewModel.autoRestTimer = it },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
+                                    checkedThumbColor = OnAccent,
                                     checkedTrackColor = AccentCyan
                                 )
                             )
                         }
-                        if (viewModel.autoRestTimer) {
+                        run {
                             Spacer(Modifier.height(12.dp))
-                            HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                            HorizontalDivider(color = TextPrimary.copy(alpha = 0.06f))
                             Spacer(Modifier.height(12.dp))
-                            Text("Duración: ${viewModel.defaultRestSeconds}s", color = AccentCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Duración del descanso: ${viewModel.defaultRestSeconds / 60}:${"%02d".format(viewModel.defaultRestSeconds % 60)}", color = AccentCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             Slider(
                                 value = viewModel.defaultRestSeconds.toFloat(),
-                                onValueChange = { viewModel.defaultRestSeconds = it.toInt() },
-                                valueRange = 30f..300f,
-                                steps = 9,
+                                onValueChange = { viewModel.defaultRestSeconds = (Math.round(it / 15f) * 15) },
+                                valueRange = 15f..300f,
+                                steps = 18, // pasos de 15 s
                                 colors = SliderDefaults.colors(activeTrackColor = AccentCyan, thumbColor = AccentCyan)
                             )
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                Text("30s", color = TextSecondary, fontSize = 10.sp)
-                                Text("5min", color = TextSecondary, fontSize = 10.sp)
+                                Text("15 s", color = TextSecondary, fontSize = 12.sp)
+                                Text("5 min", color = TextSecondary, fontSize = 12.sp)
                             }
                         }
                     }
@@ -1459,9 +1397,9 @@ fun LanguageOption(
             .clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) AccentCyan.copy(alpha = 0.12f) else Color(0xFF0A0A0A)
+            containerColor = if (isSelected) AccentCyan.copy(alpha = 0.12f) else SurfaceDark
         ),
-        border = if (isSelected) BorderStroke(1.dp, AccentCyan.copy(alpha = 0.4f)) else BorderStroke(1.dp, Color(0xFF1A1A1A))
+        border = if (isSelected) BorderStroke(1.dp, AccentCyan.copy(alpha = 0.4f)) else BorderStroke(1.dp, Border)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -1499,9 +1437,9 @@ fun TemplatesDialog(
         TemplateItem("Definición",  "🔥", stringResource(R.string.template_definition),   stringResource(R.string.template_definition_desc))
     )
     val colors = listOf(
-        Color(0xFF1A2A3A) to AccentCyan,
-        Color(0xFF2A1A1A) to Color(0xFFFF6B6B),
-        Color(0xFF2A2A0A) to Color(0xFFFFD700)
+        SurfaceAlt to AccentCyan,
+        SurfaceAlt to AccentRed,
+        SurfaceAlt to Gold
     )
 
     AlertDialog(
@@ -1517,7 +1455,7 @@ fun TemplatesDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                HorizontalDivider(color = TextPrimary.copy(alpha = 0.06f))
                 Text(
                     stringResource(R.string.templates_subtitle),
                     color = TextSecondary,

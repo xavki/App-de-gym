@@ -30,7 +30,7 @@ fun ModernButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     containerColor: Color = AccentWhite,
-    contentColor: Color = Color.Black,
+    contentColor: Color = OnAccent,
     enabled: Boolean = true
 ) {
     Button(
@@ -41,7 +41,7 @@ fun ModernButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor,
-            disabledContainerColor = Color(0xFF222222)
+            disabledContainerColor = Border
         )
     ) {
         Text(text, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
@@ -61,7 +61,7 @@ fun ExerciseImageSmall(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF1C1C1E)),
+            .background(Border),
         contentAlignment = Alignment.Center
     ) {
         if (imageUrl != null) {
@@ -114,7 +114,7 @@ fun ExerciseImageAnimated(
             .fillMaxWidth()
             .height(280.dp)
             .clip(RoundedCornerShape(24.dp))
-            .background(Color(0xFF111111)),
+            .background(SurfaceDark),
         contentAlignment = Alignment.Center
     ) {
         if (frames.isNotEmpty()) {

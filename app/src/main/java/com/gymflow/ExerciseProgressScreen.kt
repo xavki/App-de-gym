@@ -64,7 +64,7 @@ fun ExerciseProgressScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(exerciseName, color = AccentWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(ExerciseNamesEs.display(exerciseName), color = AccentWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Text(stringResource(R.string.exercise_progress_subtitle), color = TextSecondary, fontSize = 11.sp)
                     }
                 },
@@ -84,7 +84,7 @@ fun ExerciseProgressScreen(
             if (history.isEmpty()) {
                 item {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A)),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -104,9 +104,9 @@ fun ExerciseProgressScreen(
                     val best = history.maxByOrNull { it.maxWeight }
                     val bestORM = history.maxByOrNull { it.estimatedOneRM }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        ExerciseStatCard("Mejor peso", "${best?.maxWeight ?: 0} kg", "🏋️", AccentCyan, Modifier.weight(1f))
-                        ExerciseStatCard("1RM est.", "${bestORM?.estimatedOneRM?.roundToInt() ?: 0} kg", "⚡", Color(0xFFFFD700), Modifier.weight(1f))
-                        ExerciseStatCard("Sesiones", "${history.size}", "📅", Color(0xFF4CAF50), Modifier.weight(1f))
+                        ExerciseStatCard("Mejor peso", fmtKg(best?.maxWeight ?: 0.0), "🏋️", AccentCyan, Modifier.weight(1f))
+                        ExerciseStatCard("1RM est.", "${bestORM?.estimatedOneRM?.roundToInt() ?: 0} kg", "⚡", Gold, Modifier.weight(1f))
+                        ExerciseStatCard("Sesiones", "${history.size}", "📅", Success, Modifier.weight(1f))
                     }
                 }
 
@@ -153,14 +153,14 @@ private fun MetricChip(label: String, selected: Boolean, onClick: () -> Unit) {
         colors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = AccentCyan.copy(alpha = 0.18f),
             selectedLabelColor = AccentCyan,
-            containerColor = Color(0xFF0A0A0A),
+            containerColor = SurfaceDark,
             labelColor = TextSecondary
         ),
         border = FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = selected,
             selectedBorderColor = AccentCyan.copy(alpha = 0.4f),
-            borderColor = Color(0xFF1A1A1A)
+            borderColor = Border
         )
     )
 }
@@ -168,7 +168,7 @@ private fun MetricChip(label: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun ExerciseStatCard(label: String, value: String, emoji: String, color: Color, modifier: Modifier) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape = RoundedCornerShape(14.dp),
         modifier = modifier
     ) {
@@ -183,6 +183,7 @@ private fun ExerciseStatCard(label: String, value: String, emoji: String, color:
 
 @Composable
 private fun ExerciseLineChart(history: List<ExerciseDataPoint>, metric: ExerciseMetric) {
+    val pal = LocalPalette.current
     val sdf = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
     val values = history.map { pt ->
         when (metric) {
@@ -204,7 +205,7 @@ private fun ExerciseLineChart(history: List<ExerciseDataPoint>, metric: Exercise
     val prog by animProgress.asState()
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -221,7 +222,7 @@ private fun ExerciseLineChart(history: List<ExerciseDataPoint>, metric: Exercise
                     val sign = if (diff >= 0) "+" else ""
                     Text(
                         "$sign${diff.roundToInt()} $unit",
-                        color = if (diff >= 0) Color(0xFF4CAF50) else AccentRed,
+                        color = if (diff >= 0) Success else AccentRed,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -254,18 +255,18 @@ private fun ExerciseLineChart(history: List<ExerciseDataPoint>, metric: Exercise
                         lineTo(pts.last().x, h)
                         close()
                     }
-                    drawPath(path, AccentCyan.copy(alpha = 0.08f))
+                    drawPath(path, pal.accent.copy(alpha = 0.08f))
 
                     // Línea animada
                     val drawCount = (pts.size * prog).toInt().coerceAtMost(pts.size - 1)
                     for (i in 0 until drawCount) {
-                        drawLine(AccentCyan, pts[i], pts[i + 1], strokeWidth = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                        drawLine(pal.accent, pts[i], pts[i + 1], strokeWidth = 2.5.dp.toPx(), cap = StrokeCap.Round)
                     }
                     // Dots
                     pts.forEachIndexed { i, offset ->
                         if (i <= drawCount) {
-                            drawCircle(AccentCyan, 4.dp.toPx(), offset)
-                            drawCircle(BackgroundDark, 2.dp.toPx(), offset)
+                            drawCircle(pal.accent, 4.dp.toPx(), offset)
+                            drawCircle(pal.background, 2.dp.toPx(), offset)
                         }
                     }
                 }
@@ -285,7 +286,7 @@ private fun ExerciseLineChart(history: List<ExerciseDataPoint>, metric: Exercise
 private fun SessionRow(point: ExerciseDataPoint) {
     val sdf = remember { SimpleDateFormat("dd/MM/yy", Locale.getDefault()) }
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -295,7 +296,7 @@ private fun SessionRow(point: ExerciseDataPoint) {
         ) {
             Text(sdf.format(point.date), color = TextSecondary, fontSize = 12.sp, modifier = Modifier.width(64.dp))
             Text(
-                "${point.maxWeight} kg × ${point.bestReps}",
+                "${fmtKg(point.maxWeight)} × ${point.bestReps}",
                 color = TextPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
