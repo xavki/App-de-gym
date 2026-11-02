@@ -1,0 +1,94 @@
+name: Android debug APK
+
+# Compila Gym Android 1.1 (APK debug) y ejecuta los tests unitarios.
+# Solo se lanza a mano. No usa secretos ni publica releases.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit o rama a compilar (por defecto: commit 9e9a5bf de feature/room-offline-first)"
+        required: true
+        default: "9e9a5bf1516285b70ae55626dfc8a05a4b07f4ee"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-debug-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout (commit indicado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Mostrar commit compilado
+        run: |
+          git log -1 --format='commit %H%n%s'
+          grep -E 'applicationId|versionCode|versionName' app/build.gradle
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Tests unitarios (JVM)
+        run: gradle :app:testDebugUnitTest --stacktrace
+
+      - name: Compilar APK debug
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Nombrar APK y calcular huellas
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/Gym-Android-1.1-debug.apk
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          {
+            echo "## Gym Android 1.1 (debug)"
+            echo "- Commit: \`$(git rev-parse HEAD)\`"
+            echo "- SHA-256 APK: \`$(sha256sum dist/Gym-Android-1.1-debug.apk | cut -d' ' -f1)\`"
+            echo "- Certificado de firma:"
+            echo '```'
+            "$APKSIGNER" verify --print-certs dist/Gym-Android-1.1-debug.apk | grep -E 'SHA-(1|256) digest|DN'
+            echo '```'
+            echo "### Tests unitarios"
+            python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          t=f=e=s=0
+          for p in glob.glob("app/build/test-results/testDebugUnitTest/*.xml"):
+              r=ET.parse(p).getroot()
+              t+=int(r.get("tests"));f+=int(r.get("failures"));e+=int(r.get("errors"));s+=int(r.get("skipped"))
+          print(f"- Total: {t}, fallos: {f}, errores: {e}, omitidos: {s}")
+          PY
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          sha256sum dist/Gym-Android-1.1-debug.apk > dist/Gym-Android-1.1-debug.apk.sha256
+
+      - name: Publicar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gym-Android-1.1-debug
+          path: |
+            dist/Gym-Android-1.1-debug.apk
+            dist/Gym-Android-1.1-debug.apk.sha256
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Publicar informes de tests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: app/build/reports/tests/testDebugUnitTest
+          retention-days: 30
+          if-no-files-found: ignore
