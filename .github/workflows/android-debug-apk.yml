@@ -1,78 +1,111 @@
 name: Android debug APK
 
-# Compila Gym Android 1.1 (APK debug) y ejecuta los tests unitarios.
-# Solo se lanza a mano. No publica releases.
-# La APK se firma con una clave debug ESTABLE guardada en el secreto DEBUG_KEYSTORE_BASE64
-# (el ~/.android/debug.keystore del propietario), para que la huella SHA-1 no cambie entre
-# compilaciones y coincida con la registrada en Firebase. Si falta el secreto o la huella
-# resultante no es la esperada, el workflow falla antes de publicar nada.
+# Compila Gym Android 1.1 (APK debug), ejecuta los tests unitarios y firma la APK con una clave
+# debug ESTABLE (la huella SHA-1 no cambia entre compilaciones). No publica releases.
+#
+# Modelo de seguridad (ver review/google-signin-firma-estable/6-limitaciones-seguridad.md):
+#   1. verify-ref : solo lee .github/approved-commits.txt. Exige un SHA completo APROBADO. Sin secretos.
+#   2. build      : compila y prueba el commit aprobado. Ejecuta el código del repositorio (Gradle),
+#                   por eso NO tiene acceso a ningún secreto.
+#   3. sign       : trabajo aislado. NO descarga el repositorio ni ejecuta Gradle ni tests. Solo recibe la
+#                   APK, la firma con apksigner, verifica la firma y publica. Es el único con el secreto,
+#                   que debe ser un secreto de ENTORNO ("apk-signing") restringido a la rama master.
+#
+# Solo se puede lanzar desde master: así ninguna otra rama puede usar este workflow para llegar al secreto.
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: "Commit (recomendado) o rama a compilar"
+      commit_sha:
+        description: "SHA completo (40 caracteres hex) del commit a compilar. Debe figurar en .github/approved-commits.txt"
         required: true
-        default: "feature/room-offline-first"
+        type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 env:
-  # SHA-1 del certificado debug registrado en Firebase (dato público, ya figura en app/google-services.json)
+  # SHA-1 del certificado debug registrado en Firebase (dato público: figura en app/google-services.json)
   EXPECTED_DEBUG_SHA1: "8f225a7f7b38d5e30461fd345e6e630f390b5688"
 
 concurrency:
-  group: android-debug-apk-${{ github.ref }}
+  group: android-debug-apk
   cancel-in-progress: false
 
 jobs:
+  # ---------------------------------------------------------------------------------------------
+  verify-ref:
+    name: 1 - Verificar referencia aprobada
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      # La referencia del WORKFLOW (github.ref / github.sha) y la del CÓDIGO a compilar (inputs.commit_sha)
+      # son distintas. Aquí se descarga solo la lista de aprobados, del propio commit del workflow.
+      - name: Checkout (solo la lista de commits aprobados)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/approved-commits.txt
+          sparse-checkout-cone-mode: false
+
+      - name: Comprobar rama del workflow y SHA aprobado
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          WORKFLOW_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$WORKFLOW_REF" != "refs/heads/master" ]; then
+            echo "::error::Este workflow solo puede ejecutarse desde master (se ejecuta desde $WORKFLOW_REF)."
+            exit 1
+          fi
+          if ! printf '%s' "$COMMIT_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::commit_sha debe ser un SHA completo de 40 caracteres hexadecimales en minúsculas (no una rama ni un SHA corto)."
+            exit 1
+          fi
+          if ! grep -Eq "^${COMMIT_SHA}([[:space:]]|\$)" .github/approved-commits.txt; then
+            echo "::error::El commit $COMMIT_SHA no figura en .github/approved-commits.txt de master. Revísalo y apruébalo antes."
+            exit 1
+          fi
+          echo "Commit aprobado: $COMMIT_SHA"
+
+  # ---------------------------------------------------------------------------------------------
   build:
+    name: 2 - Compilar y probar (sin secretos)
+    needs: verify-ref
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      apk_sha256: ${{ steps.hash.outputs.sha256 }}
     steps:
-      - name: Checkout (commit indicado)
-        uses: actions/checkout@v4
+      - name: Checkout del commit aprobado
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.commit_sha }}
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Mostrar commit compilado
+      - name: Confirmar que se compila exactamente el commit aprobado
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
         run: |
+          set -euo pipefail
+          ACTUAL=$(git rev-parse HEAD)
+          if [ "$ACTUAL" != "$COMMIT_SHA" ]; then
+            echo "::error::HEAD ($ACTUAL) no coincide con el SHA aprobado ($COMMIT_SHA)."
+            exit 1
+          fi
           git log -1 --format='commit %H%n%s'
           grep -E 'applicationId|versionCode|versionName' app/build.gradle
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Preparar firma debug estable (secreto)
-        env:
-          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          set +x
-          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
-            echo "::error::Falta el secreto DEBUG_KEYSTORE_BASE64 (Settings > Secrets and variables > Actions)."
-            exit 1
-          fi
-          umask 077
-          mkdir -p "$HOME/.android"
-          KS="$HOME/.android/debug.keystore"
-          if ! printf '%s' "$DEBUG_KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$KS" 2>/dev/null; then
-            rm -f "$KS"
-            echo "::error::El secreto DEBUG_KEYSTORE_BASE64 no es Base64 válido."
-            exit 1
-          fi
-          # Comprobación sin imprimir nada del contenido: ¿abre con la contraseña estándar y tiene el alias esperado?
-          if ! keytool -list -keystore "$KS" -storepass android -alias androiddebugkey >/dev/null 2>&1; then
-            rm -f "$KS"
-            echo "::error::El keystore no se abre con storepass 'android' o no contiene el alias 'androiddebugkey'."
-            exit 1
-          fi
-          echo "Firma debug estable preparada."
-
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
         with:
           gradle-version: "8.11.1"
 
@@ -82,62 +115,161 @@ jobs:
       - name: Compilar APK debug
         run: gradle :app:assembleDebug --stacktrace
 
-      - name: Verificar huella de firma esperada
+      - name: Huella de la APK intermedia y resumen de tests
+        id: hash
         run: |
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-          ACTUAL=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk \
-            | grep -i 'certificate SHA-1 digest' | head -1 | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')
-          echo "SHA-1 del certificado de la APK: ${ACTUAL:-<no encontrado>}"
-          echo "SHA-1 esperado:                  $EXPECTED_DEBUG_SHA1"
-          if [ "$ACTUAL" != "$EXPECTED_DEBUG_SHA1" ]; then
-            echo "::error::La firma de la APK no coincide con la huella esperada. No se publica la APK."
-            exit 1
-          fi
-
-      - name: Nombrar APK y calcular huellas
-        run: |
-          mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/Gym-Android-1.1-debug.apk
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-          {
-            echo "## Gym Android 1.1 (debug)"
-            echo "- Commit: \`$(git rev-parse HEAD)\`"
-            echo "- SHA-256 APK: \`$(sha256sum dist/Gym-Android-1.1-debug.apk | cut -d' ' -f1)\`"
-            echo "- Certificado de firma:"
-            echo '```'
-            "$APKSIGNER" verify --print-certs dist/Gym-Android-1.1-debug.apk | grep -E 'SHA-(1|256) digest|DN'
-            echo '```'
-            echo "### Tests unitarios"
-            python3 - <<'PY'
-          import glob, xml.etree.ElementTree as ET
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          echo "sha256=$(sha256sum "$APK" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
           t=f=e=s=0
           for p in glob.glob("app/build/test-results/testDebugUnitTest/*.xml"):
               r=ET.parse(p).getroot()
               t+=int(r.get("tests"));f+=int(r.get("failures"));e+=int(r.get("errors"));s+=int(r.get("skipped"))
-          print(f"- Total: {t}, fallos: {f}, errores: {e}, omitidos: {s}")
+          line=f"- Tests unitarios: total {t}, fallos {f}, errores {e}, omitidos {s}"
+          print(line)
+          open(__import__("os").environ["GITHUB_STEP_SUMMARY"],"a").write(line+"\n")
+          sys.exit(0 if t>0 and f==0 and e==0 else 1)
           PY
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-          sha256sum dist/Gym-Android-1.1-debug.apk > dist/Gym-Android-1.1-debug.apk.sha256
 
-      - name: Publicar APK
-        uses: actions/upload-artifact@v4
+      # Esta APK está firmada con una clave aleatoria del runner: NO es la APK final y no debe instalarse.
+      - name: Publicar APK intermedia (1 día)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: Gym-Android-1.1-debug
-          path: |
-            dist/Gym-Android-1.1-debug.apk
-            dist/Gym-Android-1.1-debug.apk.sha256
-          retention-days: 30
+          name: apk-intermedia-NO-INSTALAR
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 1
           if-no-files-found: error
 
       - name: Publicar informes de tests
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: unit-test-reports
           path: app/build/reports/tests/testDebugUnitTest
           retention-days: 30
           if-no-files-found: ignore
 
-      - name: Borrar keystore del runner
-        if: always()
-        run: rm -f "$HOME/.android/debug.keystore"
+  # ---------------------------------------------------------------------------------------------
+  sign:
+    name: 3 - Firmar y verificar (aislado)
+    needs: [verify-ref, build]
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Entorno con el secreto DEBUG_KEYSTORE_BASE64 y la regla «solo rama master».
+    environment: apk-signing
+    permissions: {}
+    steps:
+      # Aquí NO hay checkout, ni Gradle, ni tests, ni scripts del repositorio.
+      - name: Descargar APK intermedia
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: apk-intermedia-NO-INSTALAR
+          path: in
+
+      - name: Comprobar integridad de la APK intermedia
+        env:
+          EXPECTED_SHA256: ${{ needs.build.outputs.apk_sha256 }}
+        run: |
+          set -euo pipefail
+          ACTUAL=$(sha256sum in/app-debug.apk | cut -d' ' -f1)
+          if [ -z "$EXPECTED_SHA256" ] || [ "$ACTUAL" != "$EXPECTED_SHA256" ]; then
+            echo "::error::La APK intermedia no coincide con la huella calculada en la compilación."
+            exit 1
+          fi
+
+      - name: Firmar con la clave debug estable (única etapa con el secreto)
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          if [ -z "${DEBUG_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::Falta el secreto DEBUG_KEYSTORE_BASE64 en el entorno apk-signing."
+            exit 1
+          fi
+          KS="$RUNNER_TEMP/gymflow-debug.keystore"
+          trap 'rm -f "$KS"' EXIT
+          if ! printf '%s' "$DEBUG_KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$KS" 2>/dev/null; then
+            echo "::error::El secreto DEBUG_KEYSTORE_BASE64 no es Base64 válido."
+            exit 1
+          fi
+          if ! keytool -list -keystore "$KS" -storepass android -alias androiddebugkey >/dev/null 2>&1; then
+            echo "::error::El keystore no se abre con storepass 'android' o no contiene el alias 'androiddebugkey'."
+            exit 1
+          fi
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::No se encontró apksigner en el Android SDK del runner."
+            exit 1
+          fi
+          mkdir -p out
+          "$APKSIGNER" sign --ks "$KS" --ks-pass pass:android --ks-key-alias androiddebugkey \
+            --key-pass pass:android --out out/Gym-Android-1.1-debug.apk in/app-debug.apk
+          echo "APK firmada."
+
+      # La clave ya se ha borrado (trap EXIT del paso anterior). Aquí solo se lee la APK.
+      - name: Verificar la firma (estricto)
+        env:
+          EXPECTED_SHA256_VAR: ${{ vars.EXPECTED_DEBUG_CERT_SHA256 }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          APK=out/Gym-Android-1.1-debug.apk
+          fail() { echo "::error::$1"; exit 1; }
+          test -s "$APK" || fail "No existe la APK firmada."
+          test ! -e "$RUNNER_TEMP/gymflow-debug.keystore" || fail "El keystore sigue en el runner."
+
+          EXPECTED_SHA256=$(printf '%s' "${EXPECTED_SHA256_VAR:-}" | tr -d ': \r\n' | tr 'A-F' 'a-f')
+          printf '%s' "$EXPECTED_SHA256" | grep -Eq '^[0-9a-f]{64}$' \
+            || fail "Falta o no es válida la variable de Actions EXPECTED_DEBUG_CERT_SHA256 (SHA-256 del certificado, 64 hex)."
+          printf '%s' "$EXPECTED_DEBUG_SHA1" | grep -Eq '^[0-9a-f]{40}$' || fail "EXPECTED_DEBUG_SHA1 no es válido."
+
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+          test -n "$APKSIGNER" || fail "No se encontró apksigner."
+
+          # Código de salida de apksigner comprobado explícitamente (sin que set -e lo oculte).
+          set +e
+          OUT=$("$APKSIGNER" verify --verbose --print-certs "$APK" 2>&1)
+          RC=$?
+          set -e
+          echo "$OUT"   # información pública (huellas de certificado), sin secretos
+          [ "$RC" -eq 0 ] || fail "apksigner verify terminó con código $RC."
+
+          printf '%s\n' "$OUT" | grep -Eq '^Verifies$' || fail "apksigner no confirma 'Verifies'."
+          printf '%s\n' "$OUT" | grep -Eq 'Verified using v[23] scheme.*: true' \
+            || fail "Ningún esquema v2/v3 verificado."
+          SIGNERS=$(printf '%s\n' "$OUT" | sed -n 's/^Number of signers: *//p')
+          [ "$SIGNERS" = "1" ] || fail "Se esperaba exactamente 1 firmante y apksigner informa: '${SIGNERS:-ninguno}'."
+
+          # Conjunto completo de firmantes/esquemas: todos deben compartir un único certificado.
+          D256=$(printf '%s\n' "$OUT" | sed -n 's/.*certificate SHA-256 digest: *\([0-9A-Fa-f]\{64\}\).*/\1/p' | tr 'A-F' 'a-f' | sort -u)
+          D1=$(printf '%s\n' "$OUT" | sed -n 's/.*certificate SHA-1 digest: *\([0-9A-Fa-f]\{40\}\).*/\1/p' | tr 'A-F' 'a-f' | sort -u)
+          [ -n "$D256" ] && [ "$(printf '%s\n' "$D256" | wc -l)" -eq 1 ] || fail "Huella SHA-256 ausente o ambigua."
+          [ -n "$D1" ] && [ "$(printf '%s\n' "$D1" | wc -l)" -eq 1 ] || fail "Huella SHA-1 ausente o ambigua."
+          [ "$D256" = "$EXPECTED_SHA256" ] || fail "El SHA-256 del certificado no es el esperado."
+          [ "$D1" = "$EXPECTED_DEBUG_SHA1" ] || fail "El SHA-1 del certificado no es el esperado."
+
+          sha256sum "$APK" > out/Gym-Android-1.1-debug.apk.sha256
+          {
+            echo "## Gym Android 1.1 (debug, firma estable)"
+            echo "- Commit compilado: \`$COMMIT_SHA\`"
+            echo "- SHA-256 de la APK: \`$(cut -d' ' -f1 out/Gym-Android-1.1-debug.apk.sha256)\`"
+            echo "- Certificado SHA-1: \`$D1\`"
+            echo "- Certificado SHA-256: \`$D256\`"
+            echo "- Firma verificada: 1 firmante, certificado esperado"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Solo se llega aquí si la verificación ha pasado: no se publica nada con una firma no válida.
+      - name: Publicar APK firmada
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Gym-Android-1.1-debug
+          path: |
+            out/Gym-Android-1.1-debug.apk
+            out/Gym-Android-1.1-debug.apk.sha256
+          retention-days: 30
+          if-no-files-found: error

@@ -1,0 +1,7 @@
+# Commits aprobados para compilar y firmar con la clave debug estable (workflow android-debug-apk.yml).
+#
+# Formato: un SHA COMPLETO de 40 caracteres hexadecimales (minúsculas) por línea, con un comentario opcional.
+# Solo cuenta la versión de este fichero que está en master. Añade una línea ÚNICAMENTE tras revisar ese commit.
+#
+# Ejemplo (NO es una aprobación):
+# 0000000000000000000000000000000000000000  descripción del commit revisado

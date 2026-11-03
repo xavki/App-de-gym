@@ -1,35 +1,39 @@
 package com.gymflow
 
 import androidx.credentials.exceptions.GetCredentialCancellationException
-import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.GetCredentialInterruptedException
 import androidx.credentials.exceptions.GetCredentialProviderConfigurationException
 import androidx.credentials.exceptions.GetCredentialUnsupportedException
 import androidx.credentials.exceptions.NoCredentialException
 
-/** Por qué ha fallado «Entrar con Google». Sin dependencias de Android: se prueba en la JVM. */
-enum class GoogleSignInFailure {
+/**
+ * Por qué ha fallado «Entrar con Google».
+ *
+ * [code] es el ÚNICO identificador de diagnóstico que se muestra o se registra: un valor fijo de esta
+ * lista. Nunca se usa el nombre de la clase, el tipo ni el mensaje de la excepción original.
+ */
+enum class GoogleSignInFailure(val code: String) {
     /** El usuario cerró el selector de cuentas. No es un error. */
-    CANCELLED,
-    /** No hay cuentas de Google utilizables en el móvil (sin cuenta o con la sesión caducada). */
-    NO_ACCOUNT,
+    CANCELLED("G-CANCEL"),
+    /** Google no devolvió ninguna credencial utilizable (no implica que falte una cuenta). */
+    NO_CREDENTIAL("G-NOCRED"),
     /** Falta el servicio de credenciales de Google (Google Play Services). */
-    PROVIDER_MISSING,
+    PROVIDER_MISSING("G-PROVIDER"),
     /** El sistema no admite Credential Manager. */
-    UNSUPPORTED,
+    UNSUPPORTED("G-UNSUPPORTED"),
     /** El sistema interrumpió la operación; basta reintentar. */
-    INTERRUPTED,
-    /** Google devolvió una respuesta que la app no entiende. */
-    INVALID_RESPONSE,
+    INTERRUPTED("G-INTERRUPTED"),
+    /** Google devolvió una respuesta que la app no entiende o que está mal formada. */
+    INVALID_RESPONSE("G-INVALID"),
     /** Cualquier otro fallo (incluye errores de configuración OAuth o de firma). */
-    UNKNOWN,
+    UNKNOWN("G-UNKNOWN"),
 }
 
 object GoogleSignInErrors {
 
     fun classify(error: Throwable): GoogleSignInFailure = when (error) {
         is GetCredentialCancellationException -> GoogleSignInFailure.CANCELLED
-        is NoCredentialException -> GoogleSignInFailure.NO_ACCOUNT
+        is NoCredentialException -> GoogleSignInFailure.NO_CREDENTIAL
         is GetCredentialProviderConfigurationException -> GoogleSignInFailure.PROVIDER_MISSING
         is GetCredentialUnsupportedException -> GoogleSignInFailure.UNSUPPORTED
         is GetCredentialInterruptedException -> GoogleSignInFailure.INTERRUPTED
@@ -40,9 +44,8 @@ object GoogleSignInErrors {
     fun message(failure: GoogleSignInFailure): String = when (failure) {
         GoogleSignInFailure.CANCELLED ->
             "Has cancelado el inicio de sesión con Google."
-        GoogleSignInFailure.NO_ACCOUNT ->
-            "No hay ninguna cuenta de Google disponible en este móvil. " +
-                "Añade una en Ajustes → Cuentas, o vuelve a iniciar sesión en ella, y prueba de nuevo."
+        GoogleSignInFailure.NO_CREDENTIAL ->
+            "Google no ha devuelto una credencial utilizable. Vuelve a intentarlo."
         GoogleSignInFailure.PROVIDER_MISSING ->
             "Falta el servicio de credenciales de Google. " +
                 "Actualiza Google Play Services desde Play Store y prueba de nuevo."
@@ -58,19 +61,12 @@ object GoogleSignInErrors {
                 "revisa que la firma de la app esté registrada en Firebase."
     }
 
-    /**
-     * Código corto para diagnosticar sin ordenador. Solo contiene el nombre de la clase de la
-     * excepción y su tipo: nunca el mensaje, el token, el correo ni el identificador de usuario.
-     */
-    fun diagnosticCode(error: Throwable): String {
-        val name = error.javaClass.simpleName.ifEmpty { "Error" }
-        return if (error is GetCredentialException) "$name/${error.type}" else name
-    }
+    /** Código de diagnóstico: siempre uno de los valores fijos de [GoogleSignInFailure]. */
+    fun diagnosticCode(failure: GoogleSignInFailure): String = failure.code
 
-    /** Texto final que se muestra al usuario: el mensaje y, si no es una cancelación, el código. */
-    fun userText(failure: GoogleSignInFailure, error: Throwable?): String {
+    /** Texto final para el usuario: el mensaje y, salvo en cancelaciones, el código fijo. */
+    fun userText(failure: GoogleSignInFailure): String {
         val base = message(failure)
-        return if (failure == GoogleSignInFailure.CANCELLED || error == null) base
-        else "$base [${diagnosticCode(error)}]"
+        return if (failure == GoogleSignInFailure.CANCELLED) base else "$base [${failure.code}]"
     }
 }
