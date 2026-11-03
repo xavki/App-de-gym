@@ -29,8 +29,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
@@ -38,7 +39,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
 import com.gymflow.data.GymRepository
 import kotlinx.coroutines.launch
 
@@ -130,20 +133,35 @@ class MainActivity : ComponentActivity() {
 
     private fun signInWithGoogle(onResult: (Boolean) -> Unit) {
         val credentialManager = CredentialManager.create(this)
-        val googleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)
-            .setServerClientId("961115677843-no9vf5lk0g2fdbs2igir8u5u4fkee5l2.apps.googleusercontent.com")
-            .build()
+        // Botón explícito → GetSignInWithGoogleOption (flujo documentado por Google para el botón
+        // «Sign in with Google»). GetGoogleIdOption es el flujo de la hoja inferior automática: no
+        // aparece si el usuario tiene desactivados los «avisos de inicio de sesión» de su cuenta
+        // de Google ni si no hay cuentas en el móvil, y entonces devuelve NoCredentialException.
+        val signInOption = GetSignInWithGoogleOption.Builder(
+            "961115677843-no9vf5lk0g2fdbs2igir8u5u4fkee5l2.apps.googleusercontent.com"
+        ).build()
 
         val request = GetCredentialRequest.Builder()
-            .addCredentialOption(googleIdOption)
+            .addCredentialOption(signInOption)
             .build()
+
+        // Muestra el motivo en español y registra solo el código de diagnóstico (sin tokens ni datos personales)
+        fun fail(failure: GoogleSignInFailure, error: Throwable?) {
+            if (error != null) Log.w("GymFlowAuth", "Google Sign-In: ${failure.name} ${GoogleSignInErrors.diagnosticCode(error)}")
+            Toast.makeText(this@MainActivity, GoogleSignInErrors.userText(failure, error), Toast.LENGTH_LONG).show()
+            onResult(false)
+        }
 
         lifecycleScope.launch {
             try {
                 Log.d("GymFlowAuth", "Iniciando proceso de Google Sign-In...")
                 val result = credentialManager.getCredential(this@MainActivity, request)
-                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(result.credential.data)
+                val received = result.credential
+                if (received !is CustomCredential || received.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                    fail(GoogleSignInFailure.INVALID_RESPONSE, null)
+                    return@launch
+                }
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(received.data)
                 val credential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
                 auth.signInWithCredential(credential).addOnCompleteListener(this@MainActivity) { task ->
                     if (task.isSuccessful) {
@@ -158,10 +176,14 @@ class MainActivity : ComponentActivity() {
                     }
                     onResult(task.isSuccessful)
                 }
+            } catch (e: GetCredentialException) {
+                fail(GoogleSignInErrors.classify(e), e)
+            } catch (e: GoogleIdTokenParsingException) {
+                fail(GoogleSignInFailure.INVALID_RESPONSE, e)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.e("GymFlowAuth", "Excepción durante el proceso: ${e.message}")
-                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                onResult(false)
+                fail(GoogleSignInFailure.UNKNOWN, e)
             }
         }
     }
