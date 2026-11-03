@@ -115,4 +115,91 @@ class GoogleSignInSupportTest {
     @Test fun `la configuracion no es nula`() {
         assertNotNull(GoogleSignInConfig.WEB_CLIENT_ID)
     }
+
+    // ---- resolveToken: la misma función que usa la app (credenciales incorrectas o mal formadas) ----
+
+    private fun resolver(custom: Boolean = true, tipo: String? = tipoEsperado, parse: () -> String?) =
+        GoogleCredentialCheck.resolveToken(custom, tipo, tipoEsperado, parse)
+
+    @Test fun `credencial correcta devuelve el token`() {
+        assertEquals(TokenResult.Ok("aaa.bbb.ccc"), resolver { "aaa.bbb.ccc" })
+    }
+
+    @Test fun `credencial que no es personalizada se rechaza sin intentar leerla`() {
+        var leida = false
+        val r = resolver(custom = false) { leida = true; "aaa.bbb.ccc" }
+        assertEquals(TokenResult.Failed(GoogleSignInFailure.INVALID_RESPONSE), r)
+        assertFalse("no debe parsear una credencial de tipo incorrecto", leida)
+    }
+
+    @Test fun `tipo de credencial incorrecto o ausente se rechaza`() {
+        for (tipo in listOf("androidx.credentials.TYPE_PASSWORD_CREDENTIAL", "", null)) {
+            var leida = false
+            val r = resolver(tipo = tipo) { leida = true; "aaa.bbb.ccc" }
+            assertEquals(TokenResult.Failed(GoogleSignInFailure.INVALID_RESPONSE), r)
+            assertFalse(leida)
+        }
+    }
+
+    @Test fun `credencial mal formada que lanza al leerla es respuesta no valida`() {
+        assertEquals(TokenResult.Failed(GoogleSignInFailure.INVALID_RESPONSE), resolver { throw IllegalArgumentException("x") })
+    }
+
+    @Test fun `token nulo, vacio o sin forma de JWT es respuesta no valida`() {
+        for (malo in listOf(null, "", "  ", "abc", "a.b", "a.b.c.d", "a..c")) {
+            assertEquals("para $malo", TokenResult.Failed(GoogleSignInFailure.INVALID_RESPONSE), resolver { malo })
+        }
+    }
+
+    @Test fun `la cancelacion de la corrutina se propaga y no se convierte en error`() {
+        try {
+            resolver { throw java.util.concurrent.CancellationException("cancelada") }
+            org.junit.Assert.fail("debía propagar la cancelación")
+        } catch (e: java.util.concurrent.CancellationException) {
+            // correcto
+        }
+    }
+
+    // ---- Recreación de Activity y recuperación de sesión (navegación por estado real) ----
+
+    @Test fun `al arrancar con sesion se abre inicio y sin sesion el login`() {
+        assertEquals(Screen.HOME, AuthNavigation.initialScreen(hasUser = true))
+        assertEquals(Screen.LOGIN, AuthNavigation.initialScreen(hasUser = false))
+    }
+
+    @Test fun `Firebase completa despues de recrearse la Activity y se sale del login`() {
+        // Activity nueva: arranca en LOGIN (aún sin sesión) y luego Firebase notifica la sesión.
+        var pantalla = AuthNavigation.initialScreen(hasUser = false)
+        pantalla = AuthNavigation.onAuthStateChanged(pantalla, hasUser = true)
+        assertEquals(Screen.HOME, pantalla)
+    }
+
+    @Test fun `notificaciones repetidas de sesion no duplican la navegacion`() {
+        val una = AuthNavigation.onAuthStateChanged(Screen.LOGIN, hasUser = true)
+        val dos = AuthNavigation.onAuthStateChanged(una, hasUser = true)
+        assertEquals(Screen.HOME, una)
+        assertEquals(una, dos)
+    }
+
+    @Test fun `un cambio de sesion no arranca al usuario de otras pantallas`() {
+        for (s in Screen.values().filter { it != Screen.LOGIN }) {
+            assertEquals(s, AuthNavigation.onAuthStateChanged(s, hasUser = true))
+            assertEquals(s, AuthNavigation.onAuthStateChanged(s, hasUser = false))
+        }
+    }
+
+    @Test fun `sin sesion se permanece en el login`() {
+        assertEquals(Screen.LOGIN, AuthNavigation.onAuthStateChanged(Screen.LOGIN, hasUser = false))
+    }
+
+    // ---- Logs sin datos privados (misma función que usa la app) ----
+
+    @Test fun `las lineas de log solo contienen el codigo fijo`() {
+        for (f in GoogleSignInFailure.values()) {
+            assertEquals("Google Sign-In: ${f.code}", GoogleSignInErrors.logMessage(f))
+        }
+        for (f in FirebaseSignInFailure.values()) {
+            assertEquals("Firebase Auth: ${f.code}", FirebaseSignInErrors.logMessage(f))
+        }
+    }
 }
