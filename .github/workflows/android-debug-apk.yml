@@ -25,6 +25,8 @@ permissions: {}
 env:
   # SHA-1 del certificado debug registrado en Firebase (dato público: figura en app/google-services.json)
   EXPECTED_DEBUG_SHA1: "8f225a7f7b38d5e30461fd345e6e630f390b5688"
+  # Android Build Tools fijados (comprobados en la auditoría). NO se elige la última versión instalada.
+  BUILD_TOOLS_VERSION: "35.0.0"
 
 concurrency:
   group: android-debug-apk
@@ -181,6 +183,17 @@ jobs:
             exit 1
           fi
 
+      - name: Verificar que Build Tools 35.0.0 está disponible (antes de usar el secreto)
+        run: |
+          set -euo pipefail
+          APKSIGNER="${ANDROID_HOME:?ANDROID_HOME no definido}/build-tools/${BUILD_TOOLS_VERSION}/apksigner"
+          if [ ! -x "$APKSIGNER" ]; then
+            echo "::error::No está disponible apksigner de Build Tools ${BUILD_TOOLS_VERSION} en el runner. No se firma."
+            ls "$ANDROID_HOME/build-tools" 2>/dev/null || true
+            exit 1
+          fi
+          echo "apksigner ${BUILD_TOOLS_VERSION} disponible."
+
       - name: Firmar con la clave debug estable (única etapa con el secreto)
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
@@ -201,9 +214,9 @@ jobs:
             echo "::error::El keystore no se abre con storepass 'android' o no contiene el alias 'androiddebugkey'."
             exit 1
           fi
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
-          if [ -z "$APKSIGNER" ]; then
-            echo "::error::No se encontró apksigner en el Android SDK del runner."
+          APKSIGNER="${ANDROID_HOME:?}/build-tools/${BUILD_TOOLS_VERSION}/apksigner"
+          if [ ! -x "$APKSIGNER" ]; then
+            echo "::error::No está disponible apksigner de Build Tools ${BUILD_TOOLS_VERSION}."
             exit 1
           fi
           mkdir -p out
@@ -228,8 +241,8 @@ jobs:
             || fail "Falta o no es válida la variable de Actions EXPECTED_DEBUG_CERT_SHA256 (SHA-256 del certificado, 64 hex)."
           printf '%s' "$EXPECTED_DEBUG_SHA1" | grep -Eq '^[0-9a-f]{40}$' || fail "EXPECTED_DEBUG_SHA1 no es válido."
 
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
-          test -n "$APKSIGNER" || fail "No se encontró apksigner."
+          APKSIGNER="${ANDROID_HOME:?}/build-tools/${BUILD_TOOLS_VERSION}/apksigner"
+          test -x "$APKSIGNER" || fail "No está disponible apksigner de Build Tools ${BUILD_TOOLS_VERSION}."
 
           # Código de salida de apksigner comprobado explícitamente (sin que set -e lo oculte).
           set +e
