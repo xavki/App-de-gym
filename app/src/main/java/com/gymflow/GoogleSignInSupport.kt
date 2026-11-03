@@ -6,8 +6,38 @@ object GoogleSignInConfig {
     const val WEB_CLIENT_ID = "961115677843-no9vf5lk0g2fdbs2igir8u5u4fkee5l2.apps.googleusercontent.com"
 }
 
+/** Resultado de validar la credencial recibida de Credential Manager. */
+sealed class TokenResult {
+    data class Ok(val idToken: String) : TokenResult()
+    data class Failed(val failure: GoogleSignInFailure) : TokenResult()
+}
+
 /** Validación de lo que devuelve Credential Manager antes de pasárselo a Firebase. Sin dependencias de Android. */
 object GoogleCredentialCheck {
+    /**
+     * Único punto que decide si una credencial es válida; lo usan la app y los tests.
+     * [parseIdToken] extrae el token (en la app, GoogleIdTokenCredential.createFrom(..).idToken) y puede lanzar
+     * si la credencial está mal formada. Una cancelación de corrutina NO se captura: se propaga.
+     */
+    fun resolveToken(
+        isCustomCredential: Boolean,
+        type: String?,
+        expectedType: String,
+        parseIdToken: () -> String?,
+    ): TokenResult {
+        if (!isCustomCredential || !isExpectedType(type, expectedType)) {
+            return TokenResult.Failed(GoogleSignInFailure.INVALID_RESPONSE)
+        }
+        val token = try {
+            parseIdToken()
+        } catch (e: java.util.concurrent.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return TokenResult.Failed(GoogleSignInFailure.INVALID_RESPONSE)
+        }
+        return if (isUsableToken(token)) TokenResult.Ok(token!!) else TokenResult.Failed(GoogleSignInFailure.INVALID_RESPONSE)
+    }
+
     /** ¿La credencial es del tipo esperado («Google ID token»)? */
     fun isExpectedType(actual: String?, expected: String): Boolean = actual != null && actual == expected
 
@@ -17,6 +47,18 @@ object GoogleCredentialCheck {
         val parts = token.split('.')
         return parts.size == 3 && parts.all { it.isNotEmpty() }
     }
+}
+
+/**
+ * Navegación según el estado REAL de autenticación de Firebase (no según callbacks de una Activity).
+ * La app la usa en el estado inicial de la pantalla y en el AuthStateListener.
+ */
+object AuthNavigation {
+    fun initialScreen(hasUser: Boolean): Screen = if (hasUser) Screen.HOME else Screen.LOGIN
+
+    /** Solo se sale del login cuando hay sesión; cualquier otra pantalla se deja como está (idempotente). */
+    fun onAuthStateChanged(current: Screen, hasUser: Boolean): Screen =
+        if (hasUser && current == Screen.LOGIN) Screen.HOME else current
 }
 
 /** Qué se sabe de un fallo de Firebase Auth. Deliberadamente SIN el mensaje de la excepción. */
@@ -64,6 +106,8 @@ object FirebaseSignInErrors {
         FirebaseSignInFailure.UNKNOWN ->
             "No se pudo completar el inicio de sesión. Inténtalo de nuevo."
     }
+
+    fun logMessage(failure: FirebaseSignInFailure): String = "Firebase Auth: ${failure.code}"
 
     fun userText(failure: FirebaseSignInFailure): String = "${message(failure)} [${failure.code}]"
 }

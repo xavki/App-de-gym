@@ -29,11 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
-import com.google.firebase.auth.FirebaseAuthException
-import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -113,7 +109,7 @@ class MainActivity : ComponentActivity() {
             GymFlowTheme(dark = dark) {
                 GymFlowApp(
                     viewModel     = viewModel,
-                    onGoogleSignIn = { onResult -> signInWithGoogle(onResult) }
+                    onGoogleSignIn = { signInWithGoogle() }
                 )
             }
         }
@@ -132,66 +128,35 @@ class MainActivity : ComponentActivity() {
     override fun onStart() { super.onStart(); viewModel.onAppForeground() }
     override fun onStop() { viewModel.onAppBackground(); super.onStop() }
 
-    private fun signInWithGoogle(onResult: (Boolean) -> Unit) {
+    private fun signInWithGoogle() {
         val appContext = applicationContext
         val credentialManager = CredentialManager.create(this)
-        // Botón explícito → GetSignInWithGoogleOption (flujo documentado por Google para el botón
-        // «Sign in with Google»). GetGoogleIdOption es el de la hoja inferior automática, que puede
-        // no mostrarse según los ajustes de la cuenta de Google y entonces devuelve NoCredentialException.
-        val request = GetCredentialRequest.Builder()
-            .addCredentialOption(GetSignInWithGoogleOption.Builder(GoogleSignInConfig.WEB_CLIENT_ID).build())
-            .build()
+        val request = GoogleSignInRequestFactory.create()
 
         // Mensajes propios en español y códigos fijos: nunca el mensaje original de la excepción
         // (puede contener correos, identificadores o tokens).
         fun failGoogle(failure: GoogleSignInFailure) {
-            Log.w("GymFlowAuth", "Google Sign-In: ${GoogleSignInErrors.diagnosticCode(failure)}")
+            Log.w("GymFlowAuth", GoogleSignInErrors.logMessage(failure))
             Toast.makeText(appContext, GoogleSignInErrors.userText(failure), Toast.LENGTH_LONG).show()
-            onResult(false)
         }
 
         lifecycleScope.launch {
             try {
                 Log.d("GymFlowAuth", "Iniciando proceso de Google Sign-In...")
-                val result = credentialManager.getCredential(this@MainActivity, request)
-                val received = result.credential
-                if (received !is CustomCredential ||
-                    !GoogleCredentialCheck.isExpectedType(received.type, GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL)
-                ) {
-                    failGoogle(GoogleSignInFailure.INVALID_RESPONSE)
-                    return@launch
-                }
-                val idToken = GoogleIdTokenCredential.createFrom(received.data).idToken
-                if (!GoogleCredentialCheck.isUsableToken(idToken)) {
-                    failGoogle(GoogleSignInFailure.INVALID_RESPONSE)
-                    return@launch
-                }
-                val credential = GoogleAuthProvider.getCredential(idToken, null)
-                // Sin pasar la Activity al listener: así el resultado no se pierde si la Activity se
-                // para o se recrea (giro de pantalla) y la marca «recordarme» y el perfil se guardan siempre.
-                // Si la Activity se recrea, la sesión se recupera igualmente por FirebaseAuth.currentUser.
-                auth.signInWithCredential(credential).addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        Log.d("GymFlowAuth", "Login con Firebase exitoso")
-                        appContext.getSharedPreferences("GymFlowPrefs", Context.MODE_PRIVATE).edit().putBoolean("remember_me", true).apply()
-                        auth.currentUser?.let { user ->
-                            FirebaseService.saveUser(user.uid, user.displayName ?: "Usuario Google", user.email ?: "")
-                        }
-                        onResult(true)
-                    } else {
-                        val error = task.exception
-                        val failure = FirebaseSignInErrors.classify(
-                            error?.let { FirebaseErrorInfo(it.javaClass.name, (it as? FirebaseAuthException)?.errorCode) }
-                        )
-                        Log.w("GymFlowAuth", "Firebase Auth: ${failure.code}")
-                        Toast.makeText(appContext, FirebaseSignInErrors.userText(failure), Toast.LENGTH_LONG).show()
-                        onResult(false)
-                    }
+                val received = credentialManager.getCredential(this@MainActivity, request).credential
+                when (val token = GoogleCredentialCheck.resolveToken(
+                    isCustomCredential = received is CustomCredential,
+                    type = received.type,
+                    expectedType = GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL,
+                    parseIdToken = { GoogleIdTokenCredential.createFrom(received.data).idToken },
+                )) {
+                    is TokenResult.Failed -> failGoogle(token.failure)
+                    // Sin Activity: si se recrea mientras Firebase responde, la pantalla se entera por el
+                    // estado de la sesión (AuthStateListener en GymFlowApp), no por un callback.
+                    is TokenResult.Ok -> GoogleFirebaseSignIn.start(auth, appContext, token.idToken)
                 }
             } catch (e: GetCredentialException) {
                 failGoogle(GoogleSignInErrors.classify(e))
-            } catch (e: GoogleIdTokenParsingException) {
-                failGoogle(GoogleSignInFailure.INVALID_RESPONSE)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -204,9 +169,20 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GymFlowApp(
     viewModel: GymFlowViewModel,
-    onGoogleSignIn: ((Boolean) -> Unit) -> Unit
+    onGoogleSignIn: () -> Unit
 ) {
-    var currentScreen by remember { mutableStateOf<Screen>(if (FirebaseService.auth.currentUser != null) Screen.HOME else Screen.LOGIN) }
+    var currentScreen by remember { mutableStateOf(AuthNavigation.initialScreen(FirebaseService.auth.currentUser != null)) }
+
+    // La pantalla observa el estado REAL de la sesión: si Firebase completa el login después de recrearse la
+    // Activity (o desde cualquier otro sitio), se sale del login una sola vez. El listener vive con la
+    // composición y se retira al salir: no guarda referencias a Activities anteriores.
+    DisposableEffect(Unit) {
+        val listener = FirebaseAuth.AuthStateListener { fa ->
+            currentScreen = AuthNavigation.onAuthStateChanged(currentScreen, fa.currentUser != null)
+        }
+        FirebaseService.auth.addAuthStateListener(listener)
+        onDispose { FirebaseService.auth.removeAuthStateListener(listener) }
+    }
     var previousScreen by remember { mutableStateOf<Screen?>(null) }
     
     // Estado para los ejercicios de Firestore
@@ -260,7 +236,7 @@ fun GymFlowApp(
                 auth = FirebaseService.auth,
                 db = FirebaseService.db,
                 onLoginSuccess = { currentScreen = Screen.HOME },
-                onGoogleSignIn = { onGoogleSignIn { if(it) currentScreen = Screen.HOME } },
+                onGoogleSignIn = { onGoogleSignIn() },
                 onError = { viewModel.errorMessage = it }
             )
             Screen.HOME -> HomeScreen(

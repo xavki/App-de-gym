@@ -61,6 +61,9 @@ object GoogleSignInErrors {
                 "revisa que la firma de la app esté registrada en Firebase."
     }
 
+    /** Línea de log: solo el código fijo, nunca datos de la excepción. Es la que usa la app. */
+    fun logMessage(failure: GoogleSignInFailure): String = "Google Sign-In: ${failure.code}"
+
     /** Código de diagnóstico: siempre uno de los valores fijos de [GoogleSignInFailure]. */
     fun diagnosticCode(failure: GoogleSignInFailure): String = failure.code
 
