@@ -93,8 +93,12 @@ class GoogleSignInSupportTest {
 
     @Test fun `FirebaseErrorInfo no transporta el mensaje de la excepcion`() {
         // Si alguien añadiera un campo con el mensaje, este test obliga a revisar la privacidad.
-        val campos = FirebaseErrorInfo::class.java.declaredFields.map { it.name }.sorted()
-        assertEquals(listOf("className", "errorCode"), campos)
+        // Solo cuentan los campos de INSTANCIA (los datos que transporta el objeto): el compilador, p. ej. el
+        // plugin de Compose, puede añadir campos ESTÁTICOS que no guardan datos de ningún objeto.
+        val campos = FirebaseErrorInfo::class.java.declaredFields
+            .filterNot { java.lang.reflect.Modifier.isStatic(it.modifiers) }
+            .map { it.name }.sorted()
+        assertEquals("campos de instancia: $campos", listOf("className", "errorCode"), campos)
     }
 
     // ---- Persistencia / recuperación de sesión ----
