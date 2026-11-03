@@ -1,0 +1,93 @@
+diff --git a/.github/workflows/android-debug-apk.yml b/.github/workflows/android-debug-apk.yml
+index 11436d8..e106c5b 100644
+--- a/.github/workflows/android-debug-apk.yml
++++ b/.github/workflows/android-debug-apk.yml
+@@ -1,18 +1,26 @@
+ name: Android debug APK
+ 
+ # Compila Gym Android 1.1 (APK debug) y ejecuta los tests unitarios.
+-# Solo se lanza a mano. No usa secretos ni publica releases.
++# Solo se lanza a mano. No publica releases.
++# La APK se firma con una clave debug ESTABLE guardada en el secreto DEBUG_KEYSTORE_BASE64
++# (el ~/.android/debug.keystore del propietario), para que la huella SHA-1 no cambie entre
++# compilaciones y coincida con la registrada en Firebase. Si falta el secreto o la huella
++# resultante no es la esperada, el workflow falla antes de publicar nada.
+ on:
+   workflow_dispatch:
+     inputs:
+       ref:
+-        description: "Commit o rama a compilar (por defecto: commit 9e9a5bf de feature/room-offline-first)"
++        description: "Commit (recomendado) o rama a compilar"
+         required: true
+-        default: "9e9a5bf1516285b70ae55626dfc8a05a4b07f4ee"
++        default: "feature/room-offline-first"
+ 
+ permissions:
+   contents: read
+ 
++env:
++  # SHA-1 del certificado debug registrado en Firebase (dato público, ya figura en app/google-services.json)
++  EXPECTED_DEBUG_SHA1: "8f225a7f7b38d5e30461fd345e6e630f390b5688"
++
+ concurrency:
+   group: android-debug-apk-${{ github.ref }}
+   cancel-in-progress: false
+@@ -39,6 +47,31 @@ jobs:
+           distribution: temurin
+           java-version: "17"
+ 
++      - name: Preparar firma debug estable (secreto)
++        env:
++          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
++        run: |
++          set +x
++          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
++            echo "::error::Falta el secreto DEBUG_KEYSTORE_BASE64 (Settings > Secrets and variables > Actions)."
++            exit 1
++          fi
++          umask 077
++          mkdir -p "$HOME/.android"
++          KS="$HOME/.android/debug.keystore"
++          if ! printf '%s' "$DEBUG_KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$KS" 2>/dev/null; then
++            rm -f "$KS"
++            echo "::error::El secreto DEBUG_KEYSTORE_BASE64 no es Base64 válido."
++            exit 1
++          fi
++          # Comprobación sin imprimir nada del contenido: ¿abre con la contraseña estándar y tiene el alias esperado?
++          if ! keytool -list -keystore "$KS" -storepass android -alias androiddebugkey >/dev/null 2>&1; then
++            rm -f "$KS"
++            echo "::error::El keystore no se abre con storepass 'android' o no contiene el alias 'androiddebugkey'."
++            exit 1
++          fi
++          echo "Firma debug estable preparada."
++
+       - uses: gradle/actions/setup-gradle@v4
+         with:
+           gradle-version: "8.11.1"
+@@ -49,6 +82,18 @@ jobs:
+       - name: Compilar APK debug
+         run: gradle :app:assembleDebug --stacktrace
+ 
++      - name: Verificar huella de firma esperada
++        run: |
++          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
++          ACTUAL=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk \
++            | grep -i 'certificate SHA-1 digest' | head -1 | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')
++          echo "SHA-1 del certificado de la APK: ${ACTUAL:-<no encontrado>}"
++          echo "SHA-1 esperado:                  $EXPECTED_DEBUG_SHA1"
++          if [ "$ACTUAL" != "$EXPECTED_DEBUG_SHA1" ]; then
++            echo "::error::La firma de la APK no coincide con la huella esperada. No se publica la APK."
++            exit 1
++          fi
++
+       - name: Nombrar APK y calcular huellas
+         run: |
+           mkdir -p dist
+@@ -92,3 +137,7 @@ jobs:
+           path: app/build/reports/tests/testDebugUnitTest
+           retention-days: 30
+           if-no-files-found: ignore
++
++      - name: Borrar keystore del runner
++        if: always()
++        run: rm -f "$HOME/.android/debug.keystore"

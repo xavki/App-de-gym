@@ -1,0 +1,260 @@
+diff --git a/app/src/main/java/com/gymflow/GoogleSignInErrors.kt b/app/src/main/java/com/gymflow/GoogleSignInErrors.kt
+new file mode 100644
+index 0000000..7d0176e
+--- /dev/null
++++ b/app/src/main/java/com/gymflow/GoogleSignInErrors.kt
+@@ -0,0 +1,76 @@
++package com.gymflow
++
++import androidx.credentials.exceptions.GetCredentialCancellationException
++import androidx.credentials.exceptions.GetCredentialException
++import androidx.credentials.exceptions.GetCredentialInterruptedException
++import androidx.credentials.exceptions.GetCredentialProviderConfigurationException
++import androidx.credentials.exceptions.GetCredentialUnsupportedException
++import androidx.credentials.exceptions.NoCredentialException
++
++/** Por qué ha fallado «Entrar con Google». Sin dependencias de Android: se prueba en la JVM. */
++enum class GoogleSignInFailure {
++    /** El usuario cerró el selector de cuentas. No es un error. */
++    CANCELLED,
++    /** No hay cuentas de Google utilizables en el móvil (sin cuenta o con la sesión caducada). */
++    NO_ACCOUNT,
++    /** Falta el servicio de credenciales de Google (Google Play Services). */
++    PROVIDER_MISSING,
++    /** El sistema no admite Credential Manager. */
++    UNSUPPORTED,
++    /** El sistema interrumpió la operación; basta reintentar. */
++    INTERRUPTED,
++    /** Google devolvió una respuesta que la app no entiende. */
++    INVALID_RESPONSE,
++    /** Cualquier otro fallo (incluye errores de configuración OAuth o de firma). */
++    UNKNOWN,
++}
++
++object GoogleSignInErrors {
++
++    fun classify(error: Throwable): GoogleSignInFailure = when (error) {
++        is GetCredentialCancellationException -> GoogleSignInFailure.CANCELLED
++        is NoCredentialException -> GoogleSignInFailure.NO_ACCOUNT
++        is GetCredentialProviderConfigurationException -> GoogleSignInFailure.PROVIDER_MISSING
++        is GetCredentialUnsupportedException -> GoogleSignInFailure.UNSUPPORTED
++        is GetCredentialInterruptedException -> GoogleSignInFailure.INTERRUPTED
++        else -> GoogleSignInFailure.UNKNOWN
++    }
++
++    /** Mensaje para el usuario, en español. */
++    fun message(failure: GoogleSignInFailure): String = when (failure) {
++        GoogleSignInFailure.CANCELLED ->
++            "Has cancelado el inicio de sesión con Google."
++        GoogleSignInFailure.NO_ACCOUNT ->
++            "No hay ninguna cuenta de Google disponible en este móvil. " +
++                "Añade una en Ajustes → Cuentas, o vuelve a iniciar sesión en ella, y prueba de nuevo."
++        GoogleSignInFailure.PROVIDER_MISSING ->
++            "Falta el servicio de credenciales de Google. " +
++                "Actualiza Google Play Services desde Play Store y prueba de nuevo."
++        GoogleSignInFailure.UNSUPPORTED ->
++            "Este móvil no admite el inicio de sesión con Google. Usa tu correo y contraseña."
++        GoogleSignInFailure.INTERRUPTED ->
++            "El inicio de sesión se interrumpió. Inténtalo de nuevo."
++        GoogleSignInFailure.INVALID_RESPONSE ->
++            "Google devolvió una respuesta que la app no reconoce. " +
++                "Actualiza Google Play Services y prueba de nuevo."
++        GoogleSignInFailure.UNKNOWN ->
++            "No se pudo iniciar sesión con Google. Inténtalo de nuevo; si sigue fallando, " +
++                "revisa que la firma de la app esté registrada en Firebase."
++    }
++
++    /**
++     * Código corto para diagnosticar sin ordenador. Solo contiene el nombre de la clase de la
++     * excepción y su tipo: nunca el mensaje, el token, el correo ni el identificador de usuario.
++     */
++    fun diagnosticCode(error: Throwable): String {
++        val name = error.javaClass.simpleName.ifEmpty { "Error" }
++        return if (error is GetCredentialException) "$name/${error.type}" else name
++    }
++
++    /** Texto final que se muestra al usuario: el mensaje y, si no es una cancelación, el código. */
++    fun userText(failure: GoogleSignInFailure, error: Throwable?): String {
++        val base = message(failure)
++        return if (failure == GoogleSignInFailure.CANCELLED || error == null) base
++        else "$base [${diagnosticCode(error)}]"
++    }
++}
+diff --git a/app/src/main/java/com/gymflow/MainActivity.kt b/app/src/main/java/com/gymflow/MainActivity.kt
+index a001b4a..6239959 100644
+--- a/app/src/main/java/com/gymflow/MainActivity.kt
++++ b/app/src/main/java/com/gymflow/MainActivity.kt
+@@ -29,8 +29,9 @@ import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.graphics.toArgb
+ import androidx.core.content.ContextCompat
+ import androidx.lifecycle.lifecycleScope
+-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
++import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
++import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
+ import com.google.firebase.auth.GoogleAuthProvider
+ import com.google.firebase.auth.FirebaseAuth
+ import com.google.firebase.auth.ktx.auth
+@@ -38,7 +39,9 @@ import com.google.firebase.firestore.FirebaseFirestore
+ import com.google.firebase.firestore.ktx.firestore
+ import com.google.firebase.ktx.Firebase
+ import androidx.credentials.CredentialManager
++import androidx.credentials.CustomCredential
+ import androidx.credentials.GetCredentialRequest
++import androidx.credentials.exceptions.GetCredentialException
+ import com.gymflow.data.GymRepository
+ import kotlinx.coroutines.launch
+ 
+@@ -130,20 +133,35 @@ class MainActivity : ComponentActivity() {
+ 
+     private fun signInWithGoogle(onResult: (Boolean) -> Unit) {
+         val credentialManager = CredentialManager.create(this)
+-        val googleIdOption = GetGoogleIdOption.Builder()
+-            .setFilterByAuthorizedAccounts(false)
+-            .setServerClientId("961115677843-no9vf5lk0g2fdbs2igir8u5u4fkee5l2.apps.googleusercontent.com")
+-            .build()
++        // Botón explícito → GetSignInWithGoogleOption (flujo documentado por Google para el botón
++        // «Sign in with Google»). GetGoogleIdOption es el flujo de la hoja inferior automática: no
++        // aparece si el usuario tiene desactivados los «avisos de inicio de sesión» de su cuenta
++        // de Google ni si no hay cuentas en el móvil, y entonces devuelve NoCredentialException.
++        val signInOption = GetSignInWithGoogleOption.Builder(
++            "961115677843-no9vf5lk0g2fdbs2igir8u5u4fkee5l2.apps.googleusercontent.com"
++        ).build()
+ 
+         val request = GetCredentialRequest.Builder()
+-            .addCredentialOption(googleIdOption)
++            .addCredentialOption(signInOption)
+             .build()
+ 
++        // Muestra el motivo en español y registra solo el código de diagnóstico (sin tokens ni datos personales)
++        fun fail(failure: GoogleSignInFailure, error: Throwable?) {
++            if (error != null) Log.w("GymFlowAuth", "Google Sign-In: ${failure.name} ${GoogleSignInErrors.diagnosticCode(error)}")
++            Toast.makeText(this@MainActivity, GoogleSignInErrors.userText(failure, error), Toast.LENGTH_LONG).show()
++            onResult(false)
++        }
++
+         lifecycleScope.launch {
+             try {
+                 Log.d("GymFlowAuth", "Iniciando proceso de Google Sign-In...")
+                 val result = credentialManager.getCredential(this@MainActivity, request)
+-                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(result.credential.data)
++                val received = result.credential
++                if (received !is CustomCredential || received.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
++                    fail(GoogleSignInFailure.INVALID_RESPONSE, null)
++                    return@launch
++                }
++                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(received.data)
+                 val credential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
+                 auth.signInWithCredential(credential).addOnCompleteListener(this@MainActivity) { task ->
+                     if (task.isSuccessful) {
+@@ -158,10 +176,14 @@ class MainActivity : ComponentActivity() {
+                     }
+                     onResult(task.isSuccessful)
+                 }
++            } catch (e: GetCredentialException) {
++                fail(GoogleSignInErrors.classify(e), e)
++            } catch (e: GoogleIdTokenParsingException) {
++                fail(GoogleSignInFailure.INVALID_RESPONSE, e)
++            } catch (e: kotlinx.coroutines.CancellationException) {
++                throw e
+             } catch (e: Exception) {
+-                Log.e("GymFlowAuth", "Excepción durante el proceso: ${e.message}")
+-                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+-                onResult(false)
++                fail(GoogleSignInFailure.UNKNOWN, e)
+             }
+         }
+     }
+diff --git a/app/src/test/java/com/gymflow/GoogleSignInErrorsTest.kt b/app/src/test/java/com/gymflow/GoogleSignInErrorsTest.kt
+new file mode 100644
+index 0000000..6dcf37a
+--- /dev/null
++++ b/app/src/test/java/com/gymflow/GoogleSignInErrorsTest.kt
+@@ -0,0 +1,87 @@
++package com.gymflow
++
++import androidx.credentials.exceptions.GetCredentialCancellationException
++import androidx.credentials.exceptions.GetCredentialInterruptedException
++import androidx.credentials.exceptions.GetCredentialProviderConfigurationException
++import androidx.credentials.exceptions.GetCredentialUnknownException
++import androidx.credentials.exceptions.GetCredentialUnsupportedException
++import androidx.credentials.exceptions.NoCredentialException
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** Tratamiento de errores de «Entrar con Google» (sin móvil, sin Firebase, sin red). */
++class GoogleSignInErrorsTest {
++
++    @Test fun `cancelar el selector se clasifica como cancelacion`() {
++        val e = GetCredentialCancellationException("Activity is cancelled by the user")
++        assertEquals(GoogleSignInFailure.CANCELLED, GoogleSignInErrors.classify(e))
++    }
++
++    @Test fun `sin credenciales se clasifica como sin cuenta`() {
++        val e = NoCredentialException("No credentials available")
++        assertEquals(GoogleSignInFailure.NO_ACCOUNT, GoogleSignInErrors.classify(e))
++    }
++
++    @Test fun `falta de proveedor y sistema no compatible`() {
++        assertEquals(
++            GoogleSignInFailure.PROVIDER_MISSING,
++            GoogleSignInErrors.classify(GetCredentialProviderConfigurationException("x"))
++        )
++        assertEquals(
++            GoogleSignInFailure.UNSUPPORTED,
++            GoogleSignInErrors.classify(GetCredentialUnsupportedException("x"))
++        )
++    }
++
++    @Test fun `interrupcion se clasifica como interrumpido`() {
++        assertEquals(
++            GoogleSignInFailure.INTERRUPTED,
++            GoogleSignInErrors.classify(GetCredentialInterruptedException("x"))
++        )
++    }
++
++    @Test fun `errores desconocidos y de otro tipo caen en UNKNOWN`() {
++        assertEquals(
++            GoogleSignInFailure.UNKNOWN,
++            GoogleSignInErrors.classify(GetCredentialUnknownException("x"))
++        )
++        assertEquals(GoogleSignInFailure.UNKNOWN, GoogleSignInErrors.classify(IllegalStateException("x")))
++    }
++
++    @Test fun `todos los mensajes estan en espanol y no estan vacios`() {
++        for (f in GoogleSignInFailure.values()) {
++            val m = GoogleSignInErrors.message(f)
++            assertTrue("mensaje vacío para $f", m.isNotBlank())
++            assertFalse("mensaje en inglés para $f: $m", m.contains("No credentials available"))
++        }
++    }
++
++    @Test fun `el codigo de diagnostico no incluye el mensaje de la excepcion`() {
++        val secreto = "eyJhbGciOiJSUzI1NiJ9.TOKEN-SECRETO usuario@correo.com"
++        val e = NoCredentialException(secreto)
++        val code = GoogleSignInErrors.diagnosticCode(e)
++        assertTrue(code.startsWith("NoCredentialException/"))
++        assertFalse(code.contains("TOKEN-SECRETO"))
++        assertFalse(code.contains("@"))
++        assertFalse(GoogleSignInErrors.userText(GoogleSignInErrors.classify(e), e).contains("TOKEN-SECRETO"))
++    }
++
++    @Test fun `una excepcion que no es de credenciales solo da su nombre`() {
++        assertEquals("IllegalStateException", GoogleSignInErrors.diagnosticCode(IllegalStateException("datos")))
++    }
++
++    @Test fun `la cancelacion no muestra codigo tecnico`() {
++        val e = GetCredentialCancellationException("x")
++        val text = GoogleSignInErrors.userText(GoogleSignInFailure.CANCELLED, e)
++        assertEquals(GoogleSignInErrors.message(GoogleSignInFailure.CANCELLED), text)
++    }
++
++    @Test fun `un fallo real muestra mensaje y codigo`() {
++        val e = NoCredentialException("x")
++        val text = GoogleSignInErrors.userText(GoogleSignInFailure.NO_ACCOUNT, e)
++        assertTrue(text.startsWith(GoogleSignInErrors.message(GoogleSignInFailure.NO_ACCOUNT)))
++        assertTrue(text.endsWith("]"))
++    }
++}
