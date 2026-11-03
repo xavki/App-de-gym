@@ -1,0 +1,499 @@
+diff --git a/app/src/androidTest/java/com/gymflow/auth/AuthEmulator.kt b/app/src/androidTest/java/com/gymflow/auth/AuthEmulator.kt
+new file mode 100644
+index 0000000..3fe2904
+--- /dev/null
++++ b/app/src/androidTest/java/com/gymflow/auth/AuthEmulator.kt
+@@ -0,0 +1,247 @@
++package com.gymflow.auth
++
++import android.content.Context
++import android.net.ConnectivityManager
++import android.net.NetworkCapabilities
++import android.os.Build
++import android.provider.Settings
++import androidx.test.platform.app.InstrumentationRegistry
++import com.google.android.gms.tasks.Tasks
++import com.google.firebase.FirebaseApp
++import com.google.firebase.auth.FirebaseAuth
++import com.google.firebase.firestore.FirebaseFirestore
++import com.gymflow.sync.SyncManager
++import java.net.HttpURLConnection
++import java.net.InetAddress
++import java.net.InetSocketAddress
++import java.net.Socket
++import java.net.URL
++import java.net.URLEncoder
++import java.net.UnknownHostException
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicInteger
++import org.junit.rules.TestRule
++import org.junit.runner.Description
++import org.junit.runners.model.Statement
++
++/** Pruebas de que cada capa de aislamiento se verificó de verdad en ESTE proceso (las lee un test). */
++object Evidence {
++    @Volatile var deviceVerified = false
++    @Volatile var isolatedProcessVerified = false
++    @Volatile var networkIsolationVerified = false
++    @Volatile var firestoreRedirected = false
++    @Volatile var authRedirectProved = false
++    val testsFinishedOk = AtomicInteger(0)
++}
++
++/**
++ * Aislamiento de las pruebas de autenticación. TODAS las comprobaciones FALLAN CERRADO con
++ * «EJECUCIÓN BLOQUEADA»: no hay argumentos de instrumentación que las desactiven, ni `assume`/omisiones.
++ *
++ * Orden (la Activity no se lanza hasta que todo pase; la entrada canario del SDK solo se intenta cuando la red
++ * ya se ha demostrado aislada, de modo que si el SDK apuntara a producción NO podría salir del dispositivo):
++ *  1 emulador (no teléfono) · 2 proceso aislado · 3 destino local · 4 red sin salida · 5 emuladores locales
++ *  6 redirección + ajustes de Firestore · 7 sin servidor de sincronización · 8 borrado local · 9 canario de Auth
++ *
++ * LÍMITE (no resoluble desde el código de pruebas): la instalación de la APK la hace Gradle/ADB ANTES de que
++ * corra cualquier test. Comprobar el destino ADB (serial de GymFlow_Test_API35) antes de instalar es OBLIGATORIO
++ * y externo; ver el procedimiento. Los argumentos admitidos son solo authEmulatorHost (10.0.2.2 o localhost), emulatorProject (demo-*)
++ * y class (debe ser esta clase).
++ */
++object AuthEmulator {
++    private val args get() = InstrumentationRegistry.getArguments()
++    val host: String get() = args.getString("authEmulatorHost") ?: "10.0.2.2"
++    val project: String get() = args.getString("emulatorProject") ?: "demo-gymflow"
++    const val AUTH_PORT = 9099
++    const val FIRESTORE_PORT = 8080
++    const val ISOLATED_CLASS = "com.gymflow.auth.AuthLifecycleTest"
++    // 10.0.2.2: alias del PC desde el AVD (valor por defecto). localhost: solo con `adb -s SERIAL reverse` y porque el
++    // network_security_config de debug ya permite HTTP a localhost. 127.0.0.1 NO se admite (ese config no lo permite).
++    private val allowedHosts = setOf("10.0.2.2", "localhost")
++    private var configured = false
++    private var networkChecked = false
++
++    private fun fail(msg: String): Nothing = throw AssertionError("EJECUCIÓN BLOQUEADA – AISLAMIENTO FIREBASE: $msg")
++
++    // ---- H1: solo en un emulador de Android, nunca en un teléfono (no desactivable) ----
++    private fun getprop(k: String) = try {
++        Runtime.getRuntime().exec(arrayOf("getprop", k)).inputStream.bufferedReader().readText().trim()
++    } catch (e: Exception) { "" }
++
++    fun requireEmulatorDevice() {
++        if (Evidence.deviceVerified) return
++        val hw = Build.HARDWARE.lowercase(); val prod = Build.PRODUCT.lowercase(); val fp = Build.FINGERPRINT.lowercase()
++        // OBLIGATORIAS (las tres): un teléfono real no las cumple.
++        val hwOk = hw == "goldfish" || hw == "ranchu"
++        val prodOk = prod.contains("sdk") || prod.contains("emu") || prod.contains("gphone")
++        val fpOk = fp.startsWith("generic") || fp.contains("/sdk_") || fp.contains("emulator") || fp.contains("gphone")
++        if (!(hwOk && prodOk && fpOk))
++            fail("el dispositivo NO es un emulador (hardware=${Build.HARDWARE}, producto=${Build.PRODUCT}). No se ejecuta nada.")
++        // CORROBORACIÓN adicional SOLO si la propiedad es accesible (SELinux puede ocultarla): un valor legible que NO sea
++        // «1» contradice al emulador y se rechaza; un valor ilegible/vacío no cuenta ni a favor ni en contra.
++        for (k in listOf("ro.boot.qemu", "ro.kernel.qemu")) {
++            val v = getprop(k)
++            if (v.isNotEmpty() && v != "1") fail("la propiedad $k vale '$v': no es un emulador.")
++        }
++        Evidence.deviceVerified = true
++    }
++
++    // ---- H6: proceso de instrumentación propio, solo esta clase ----
++    fun requireIsolatedProcess() {
++        val clase = args.getString("class")
++        if (clase != ISOLATED_CLASS)
++            fail("hay que ejecutar SOLO $ISOLATED_CLASS (-e class $ISOLATED_CLASS); recibido: '${clase ?: "<todo el APK de tests>"}'.")
++        Evidence.isolatedProcessVerified = true
++    }
++
++    // ---- H4: destinos REST autorizados ----
++    fun requireLocalTarget() {
++        if (host !in allowedHosts) fail("el host '$host' no está autorizado (solo ${allowedHosts.joinToString()}).")
++        if (!project.startsWith("demo-")) fail("el proyecto '$project' no empieza por 'demo-'.")
++    }
++
++    // ---- H2: la red del dispositivo no debe poder salir a Internet (varias señales, ninguna se da por suficiente) ----
++    private fun connects(ip: String, port: Int) = try {
++        Socket().use { it.connect(InetSocketAddress(InetAddress.getByName(ip), port), 2000) }; true
++    } catch (e: Exception) { false }
++
++    private fun resolves(name: String) = try { InetAddress.getByName(name); true } catch (e: UnknownHostException) { false }
++
++    fun requireNetworkIsolation(ctx: Context) {
++        if (networkChecked) return
++        // a) ningún proxy global (sería una ruta alternativa)
++        val proxy = Settings.Global.getString(ctx.contentResolver, "http_proxy").orEmpty()
++        if (proxy.isNotBlank() && proxy != ":0") fail("hay un proxy HTTP global configurado.")
++        for (p in listOf("http.proxyHost", "https.proxyHost", "socksProxyHost"))
++            if (!System.getProperty(p).isNullOrBlank()) fail("hay un proxy en la propiedad $p.")
++        // b) Android no debe considerar la red «validada» (con Internet comprobado)
++        val cm = ctx.getSystemService(ConnectivityManager::class.java)
++        val caps = try { cm.getNetworkCapabilities(cm.activeNetwork) } catch (e: SecurityException) { fail("sin permiso para leer el estado de red.") }
++        if (caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true) fail("Android tiene conexión a Internet validada.")
++        // c) conexiones TCP a IP públicas sin DNS: ninguna debe prosperar
++        for (ip in listOf("1.1.1.1", "8.8.8.8", "9.9.9.9")) if (connects(ip, 443)) fail("hay salida TCP a $ip:443.")
++        // d) los nombres de producción no deben resolverse
++        for (h in listOf("identitytoolkit.googleapis.com", "securetoken.googleapis.com", "firestore.googleapis.com",
++            "firebaseinstallations.googleapis.com", "www.googleapis.com", "accounts.google.com", "play.googleapis.com"))
++            if (resolves(h)) fail("el dispositivo resuelve $h.")
++        networkChecked = true
++        Evidence.networkIsolationVerified = true
++    }
++
++    fun reachable(port: Int): Boolean = try {
++        requireLocalTarget()
++        val c = URL("http://$host:$port/").openConnection() as HttpURLConnection
++        c.connectTimeout = 2000; c.readTimeout = 2000
++        c.responseCode; true
++    } catch (e: Exception) { false }
++
++    fun requireEmulatorsUp() {
++        if (!reachable(AUTH_PORT)) fail("Auth Emulator no responde en $host:$AUTH_PORT.")
++        if (!reachable(FIRESTORE_PORT)) fail("Firestore Emulator no responde en $host:$FIRESTORE_PORT.")
++    }
++
++    /** Una vez por proceso, antes de lanzar la Activity. Cualquier excepción detiene la ejecución. */
++    @Synchronized fun configureOnce() {
++        if (!configured) {
++            try {
++                FirebaseAuth.getInstance().useEmulator(host, AUTH_PORT)
++                FirebaseFirestore.getInstance().useEmulator(host, FIRESTORE_PORT)
++            } catch (e: Exception) {
++                fail("no se pudo redirigir Firebase a los emuladores (${e.javaClass.simpleName}).")
++            }
++            configured = true
++        }
++        val s = FirebaseFirestore.getInstance().firestoreSettings
++        if (s.host != "$host:$FIRESTORE_PORT" || s.isSslEnabled) fail("Firestore no apunta al emulador (host=${s.host}, ssl=${s.isSslEnabled}).")
++        Evidence.firestoreRedirected = true
++    }
++
++    fun requireNoSyncServer(ctx: Context) {
++        if (SyncManager.serverUrl(ctx).isNotBlank()) fail("hay una URL de sincronización configurada.")
++    }
++
++    /** Diagnóstico seguro: sin cuerpo de la petición, sin cabeceras ni parámetros (query); respuesta recortada. */
++    private fun call(method: String, port: Int, path: String, body: String? = null): String {
++        requireLocalTarget()
++        val c = URL("http://$host:$port$path").openConnection() as HttpURLConnection
++        c.requestMethod = method; c.connectTimeout = 5000; c.readTimeout = 5000
++        c.setRequestProperty("Authorization", "Bearer owner")
++        if (body != null) { c.doOutput = true; c.setRequestProperty("Content-Type", "application/json"); c.outputStream.use { it.write(body.toByteArray()) } }
++        val code = c.responseCode
++        val texto = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.readText().orEmpty()
++        if (code !in 200..299) {
++            val resumen = texto.replace(Regex("\\s+"), " ").take(200)
++            throw AssertionError("ERROR REST DEL EMULADOR: $method ${path.substringBefore('?')} (puerto $port) respondió HTTP $code. Respuesta: '$resumen'")
++        }
++        return texto
++    }
++
++    /** Borra SOLO el estado de los emuladores locales (host autorizado en cada llamada). */
++    fun resetAll() {
++        call("DELETE", AUTH_PORT, "/emulator/v1/projects/$project/accounts")
++        call("DELETE", FIRESTORE_PORT, "/emulator/v1/projects/${FirebaseApp.getInstance().options.projectId}/databases/(default)/documents")
++        val quedan = emulatorUserCount()
++        if (quedan != 0) fail("tras el borrado quedan $quedan usuarios en el emulador; el estado no está limpio.")
++    }
++
++    fun createEmailUser(email: String, password: String) {
++        call("POST", AUTH_PORT, "/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key",
++            """{"email":"$email","password":"$password","returnSecureToken":false}""")
++    }
++
++    private fun accounts() = call("GET", AUTH_PORT, "/identitytoolkit.googleapis.com/v1/projects/$project/accounts:batchGet?maxResults=100")
++    fun emulatorUserCount() = Regex("\"localId\"").findAll(accounts()).count()
++    fun emulatorHasEmail(email: String) = accounts().contains("\"$email\"")
++
++    /**
++     * H3 – Prueba PREVIA de que el SDK de Auth usa el emulador. Solo se intenta con la red ya demostrada aislada:
++     * si el SDK apuntara a producción, la petición no tendría salida y la prueba fallaría sin enviar nada.
++     * Usa un usuario ficticio creado por REST SOLO en el emulador local. Una vez por proceso.
++     */
++    @Synchronized fun proveAuthRedirectOnce() {
++        if (Evidence.authRedirectProved) return
++        if (!Evidence.networkIsolationVerified || !Evidence.deviceVerified || !configured)
++            fail("la entrada canario no se intenta sin aislamiento de red, emulador y redirección verificados.")
++        val tag = System.nanoTime()
++        val email = "canary-$tag@example.invalid"; val pass = "Canary-$tag-x"
++        createEmailUser(email, pass)
++        val auth = FirebaseAuth.getInstance()
++        val user = try { Tasks.await(auth.signInWithEmailAndPassword(email, pass), 20, TimeUnit.SECONDS).user }
++        catch (e: Exception) { fail("la entrada canario del SDK no llegó al emulador (${e.javaClass.simpleName}).") }
++        if (user?.email != email || !emulatorHasEmail(email)) fail("la entrada canario no coincide con el usuario del emulador.")
++        auth.signOut()
++        Evidence.authRedirectProved = true
++    }
++
++    /** Token de Google FALSO (JSON sin firmar). NO se presupone aceptado: lo comprueba fakeGoogleTokenResponse(). */
++    fun fakeGoogleIdToken(sub: String, email: String) = """{"sub":"$sub","email":"$email","email_verified":true}"""
++
++    fun fakeGoogleTokenResponse(): String {
++        val idToken = URLEncoder.encode(fakeGoogleIdToken("preflight-sub", "preflight@example.invalid"), "UTF-8")
++        return call("POST", AUTH_PORT, "/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=fake-api-key",
++            """{"postBody":"id_token=$idToken&providerId=google.com","requestUri":"http://localhost","returnIdpCredential":true,"returnSecureToken":true}""")
++    }
++
++    fun prefs(ctx: Context) = ctx.getSharedPreferences("GymFlowPrefs", Context.MODE_PRIVATE)
++}
++
++class AuthEmulatorRule : TestRule {
++    override fun apply(base: Statement, description: Description) = object : Statement() {
++        override fun evaluate() {
++            val ctx = InstrumentationRegistry.getInstrumentation().targetContext
++            AuthEmulator.requireEmulatorDevice()        // 1) emulador, no teléfono
++            AuthEmulator.requireIsolatedProcess()       // 2) solo esta clase en el proceso
++            AuthEmulator.requireLocalTarget()           // 3) host y proyecto permitidos
++            AuthEmulator.requireNetworkIsolation(ctx)   // 4) sin salida a Internet
++            AuthEmulator.requireEmulatorsUp()           // 5) emuladores locales presentes
++            AuthEmulator.configureOnce()                // 6) redirección antes de lanzar la Activity
++            AuthEmulator.requireNoSyncServer(ctx)       // 7) sin servidor de sincronización
++            AuthEmulator.resetAll()                     // 8) estado limpio SOLO en el emulador local
++            AuthEmulator.proveAuthRedirectOnce()        // 9) canario: el SDK usa el emulador
++            AuthEmulator.resetAll()
++            FirebaseAuth.getInstance().signOut()
++            AuthEmulator.prefs(ctx).edit().clear().commit()
++            try { base.evaluate() } finally { FirebaseAuth.getInstance().signOut() }
++        }
++    }
++}
+diff --git a/app/src/androidTest/java/com/gymflow/auth/AuthLifecycleTest.kt b/app/src/androidTest/java/com/gymflow/auth/AuthLifecycleTest.kt
+new file mode 100644
+index 0000000..9f2d698
+--- /dev/null
++++ b/app/src/androidTest/java/com/gymflow/auth/AuthLifecycleTest.kt
+@@ -0,0 +1,240 @@
++package com.gymflow.auth
++
++import androidx.compose.ui.test.hasSetTextAction
++import androidx.compose.ui.test.hasText
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onAllNodesWithText
++import androidx.compose.ui.test.onNodeWithText
++import androidx.compose.ui.test.performClick
++import androidx.compose.ui.test.performTextInput
++import androidx.lifecycle.ViewModelProvider
++import androidx.test.ext.junit.runners.AndroidJUnit4
++import androidx.test.platform.app.InstrumentationRegistry
++import com.google.android.gms.tasks.Tasks
++import com.google.firebase.auth.FirebaseAuth
++import com.google.firebase.auth.FirebaseAuthException
++import com.gymflow.GoogleFirebaseSignIn
++import com.gymflow.GymFlowViewModel
++import com.gymflow.MainActivity
++import com.gymflow.R
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicInteger
++import org.junit.AfterClass
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Ignore
++import org.junit.Rule
++import org.junit.Test
++import org.junit.rules.RuleChain
++import org.junit.rules.TestWatcher
++import org.junit.runner.Description
++import org.junit.runner.RunWith
++
++/**
++ * Ciclo de vida del login con la MainActivity REAL, la pantalla real y el código real de producción
++ * (GoogleFirebaseSignIn, AuthNavigation, SessionPolicy) contra los emuladores de Firebase.
++ *
++ * EJECUCIÓN: SOLO esta clase, en su propio proceso de instrumentación, en el AVD GymFlow_Test_API35 y con el PC sin
++ * Internet (ver el procedimiento): -e class com.gymflow.auth.AuthLifecycleTest. No hay omisiones: si falta
++ * algo del aislamiento, FALLA («EJECUCIÓN BLOQUEADA»). Al final se exige que se ejecutaran TODAS las pruebas activas.
++ */
++@RunWith(AndroidJUnit4::class)
++class AuthLifecycleTest {
++
++    companion object {
++        private val terminadasOk = AtomicInteger(0)
++
++        /** H5: si alguna prueba activa no se ejecutó o no terminó bien (omisión, filtro, fallo), la clase FALLA. */
++        @AfterClass @JvmStatic fun todasLasPruebasActivasSeEjecutaron() {
++            val activas = AuthLifecycleTest::class.java.methods.count {
++                it.isAnnotationPresent(Test::class.java) && !it.isAnnotationPresent(Ignore::class.java)
++            }
++            assertEquals("pruebas activas que terminaron bien", activas, terminadasOk.get())
++        }
++    }
++
++    @get:Rule val contador = object : TestWatcher() {
++        override fun succeeded(description: Description) { terminadasOk.incrementAndGet() }
++    }
++
++    private val compose = createAndroidComposeRule<MainActivity>()
++    // El aislamiento (emuladores) se verifica y configura ANTES de lanzar la Activity.
++    @get:Rule val chain: RuleChain = RuleChain.outerRule(AuthEmulatorRule()).around(compose)
++
++    private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
++    private val auth get() = FirebaseAuth.getInstance()
++    private val email = "gymflow-test@example.invalid"
++    private val password = "Test-1234-abc"
++
++    private fun enLogin() = compose.onAllNodesWithText(ctx.getString(R.string.app_tagline)).fetchSemanticsNodes().isNotEmpty()
++    private fun enInicio() = compose.onAllNodesWithText("Inicio").fetchSemanticsNodes().isNotEmpty()
++    private fun esperarInicio() = compose.waitUntil(20_000) { enInicio() }
++    private fun esperarLogin() = compose.waitUntil(20_000) { enLogin() }
++    private fun recordarme() = AuthEmulator.prefs(ctx).getBoolean("remember_me", false)
++
++    /** Evidencia: la Activity es REALMENTE una instancia nueva. */
++    private fun recrear() {
++        val antes = compose.activity
++        compose.activityRule.scenario.recreate(); compose.waitForIdle()
++        assertTrue("la Activity debía ser una instancia nueva", compose.activity !== antes)
++    }
++
++    /**
++     * Sesión de Google SIMULADA con el código real de producción. Con esperar=true exige la evidencia de que la
++     * operación se hizo: el SDK completó el inicio de sesión Y el emulador conoce al usuario.
++     */
++    private fun sesionGoogle(sub: String = "sub-1", esperar: Boolean = true) {
++        val correo = "$sub@example.invalid"
++        InstrumentationRegistry.getInstrumentation().runOnMainSync {
++            GoogleFirebaseSignIn.start(auth, ctx.applicationContext, AuthEmulator.fakeGoogleIdToken(sub, correo))
++        }
++        if (esperar) esperarSesionDe(correo)
++    }
++
++    private fun esperarSesionDe(correo: String) {
++        compose.waitUntil(20_000) { auth.currentUser?.email == correo }
++        assertTrue("el emulador debe conocer a $correo (la operación llegó al emulador)", AuthEmulator.emulatorHasEmail(correo))
++    }
++
++    private fun escribir(etiqueta: String, texto: String) =
++        compose.onNode(hasSetTextAction() and hasText(etiqueta)).performTextInput(texto)
++
++    private fun loginPorCorreo(pass: String, recordar: Boolean) {
++        escribir("Email", email); escribir("Contraseña", pass)
++        if (recordar) compose.onNodeWithText("Recordar sesión").performClick()
++        compose.onNodeWithText("ENTRAR").performClick()
++    }
++
++    private fun viewModel() = ViewModelProvider(compose.activity.viewModelStore, ViewModelProvider.NewInstanceFactory())[GymFlowViewModel::class.java]
++
++    // 0: el aislamiento se verificó de verdad en este proceso (aparece como prueba propia en el informe)
++    @Test fun aislamiento_verificadoAntesDeLanzarLaActividad() {
++        assertTrue("dispositivo emulado", Evidence.deviceVerified)
++        assertTrue("proceso aislado", Evidence.isolatedProcessVerified)
++        assertTrue("red sin salida", Evidence.networkIsolationVerified)
++        assertTrue("Firestore redirigido", Evidence.firestoreRedirected)
++        assertTrue("Auth redirigido (entrada canario)", Evidence.authRedirectProved)
++    }
++
++    // 0b: el token JSON falso NO se presupone aceptado: se comprueba a nivel REST, con mensaje específico
++    @Test fun preflight_elEmuladorAceptaElTokenFalsoDeGoogle() {
++        val r = AuthEmulator.fakeGoogleTokenResponse()
++        assertTrue("El emulador no aceptó el token falso (respuesta: $r)", r.contains("\"idToken\"") && r.contains("\"localId\""))
++    }
++
++    // 1 + 7: LOGIN → HOME con sesión simulada, y remember_me
++    @Test fun sesionGoogleSimulada_llevaDeLoginAInicio_yGuardaRecordarme() {
++        esperarLogin(); assertNull(auth.currentUser)
++        sesionGoogle()
++        esperarInicio()
++        assertTrue(recordarme())
++        assertEquals("el SDK debe haber hablado con el emulador, no con la nube", 1, AuthEmulator.emulatorUserCount())
++    }
++
++    // 2: recreación real ANTES de recibir la sesión
++    @Test fun recrearAntesDeRecibirLaSesion_laNuevaActivityAbreInicio() {
++        esperarLogin()
++        recrear(); esperarLogin()
++        sesionGoogle()
++        esperarInicio()
++    }
++
++    // 2 (carrera): la sesión llega mientras la Activity se recrea; el orden varía, el resultado no
++    @Test fun sesionQueLlegaMientrasSeRecrea_terminaEnInicio() {
++        esperarLogin()
++        sesionGoogle(esperar = false); recrear()
++        esperarInicio()
++        esperarSesionDe("sub-1@example.invalid")
++        assertTrue(recordarme())
++    }
++
++    // 3 + 8: recreación DESPUÉS de la sesión → se recupera
++    @Test fun recrearDespuesDeLaSesion_conservaInicio() {
++        sesionGoogle(); esperarInicio()
++        recrear()
++        esperarInicio(); assertFalse(enLogin())
++    }
++
++    // 4 (INDIRECTO): no demuestra que el listener anterior se retire; solo que no hay fallo y la nueva composición navega
++    @Test fun recrearYRecibirSesion_laNuevaComposicionNavegaYLaAnteriorNoRompe() {
++        esperarLogin()
++        recrear()
++        sesionGoogle()
++        esperarInicio()
++        assertEquals(1, AuthEmulator.emulatorUserCount())
++    }
++
++    // 5: una NUEVA notificación de sesión (otro usuario) con la pantalla ya en HOME no reinicia la navegación
++    @Test fun sesionDeOtroUsuarioConLaPantallaEnPerfil_noReiniciaLaNavegacion() {
++        sesionGoogle("sub-1"); esperarInicio()
++        compose.onNodeWithText("Perfil").performClick(); compose.waitForIdle()
++        sesionGoogle("sub-2")
++        compose.waitUntil(20_000) { AuthEmulator.emulatorUserCount() == 2 }
++        compose.waitForIdle()
++        assertTrue(enInicio()); assertFalse(enLogin())
++    }
++
++    // 9: cerrar sesión → no se recupera
++    @Test fun cerrarSesion_yRecrear_noRecuperaLaSesion() {
++        sesionGoogle(); esperarInicio()
++        assertNotNull(auth.currentUser)
++        InstrumentationRegistry.getInstrumentation().runOnMainSync { auth.signOut() }
++        recrear(); esperarLogin()
++        assertNull(auth.currentUser)
++    }
++
++    // 9: con sesión pero SIN «recordarme», al (re)crear la Activity se cierra la sesión (política ACTUAL; caracterización)
++    @Test fun conSesionSinRecordarme_alCrearLaActivitySeCierraLaSesion() {
++        sesionGoogle(); esperarInicio()
++        AuthEmulator.prefs(ctx).edit().putBoolean("remember_me", false).commit()
++        recrear(); esperarLogin()
++        assertNull(auth.currentUser)
++    }
++
++    // 10: login por correo (sin regresiones)
++    @Test fun loginPorCorreo_conRecordarme_llevaAInicio_guardaRecordarme_yRecuperaTrasRecrear() {
++        AuthEmulator.createEmailUser(email, password)
++        esperarLogin(); loginPorCorreo(password, recordar = true)
++        esperarInicio(); esperarSesionDe(email)
++        assertTrue(recordarme())
++        recrear(); esperarInicio()
++    }
++
++    // H5: demuestra que el intento SE HIZO (callback de Auth con error) y que el rechazo vino del EMULADOR
++    @Test fun loginPorCorreo_conContrasenaIncorrecta_seIntentaYSeRechaza() {
++        AuthEmulator.createEmailUser(email, password)
++        esperarLogin()
++        val vm = viewModel()
++        assertNull("no debe haber un error previo", vm.errorMessage)
++        loginPorCorreo("incorrecta-123", recordar = true)
++        compose.waitUntil(20_000) { !vm.errorMessage.isNullOrBlank() }   // evidencia 1: el intento de la UI terminó con error
++        assertTrue(enLogin()); assertNull(auth.currentUser)
++        // evidencia 2: el mismo rechazo, observado por el SDK, procede del emulador (credenciales inválidas, no un fallo de red)
++        val codigo = try { Tasks.await(auth.signInWithEmailAndPassword(email, "incorrecta-123"), 20, TimeUnit.SECONDS); "" }
++            catch (e: Exception) { ((e.cause ?: e) as? FirebaseAuthException)?.errorCode.orEmpty() }
++        assertTrue("código de rechazo inesperado: '$codigo'",
++            codigo in setOf("ERROR_INVALID_CREDENTIAL", "ERROR_WRONG_PASSWORD", "ERROR_INVALID_LOGIN_CREDENTIALS"))
++        assertNull(auth.currentUser)
++    }
++
++    // 10 (caracterización del comportamiento ACTUAL, a revisar): sin «Recordar sesión», recrear cierra la sesión
++    @Test fun loginPorCorreo_sinRecordarme_recrearLaActivityCierraLaSesion_comportamientoActual() {
++        AuthEmulator.createEmailUser(email, password)
++        esperarLogin(); loginPorCorreo(password, recordar = false)
++        esperarInicio(); esperarSesionDe(email); assertFalse(recordarme())
++        recrear(); esperarLogin()
++        assertNull(auth.currentUser)
++    }
++
++    // Comportamiento DESEADO tras la corrección propuesta de remember_me (hoy falla): ver el informe.
++    @Ignore("Pendiente de la corrección de remember_me (propuesta A): hoy recrear la Activity cierra la sesión")
++    @Test fun conSesionSinRecordarme_alRecrearPorConfiguracion_conservaLaSesion() {
++        sesionGoogle(); esperarInicio()
++        AuthEmulator.prefs(ctx).edit().putBoolean("remember_me", false).commit()
++        recrear(); esperarInicio()
++        assertNotNull(auth.currentUser)
++    }
++}
