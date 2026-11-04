@@ -213,6 +213,9 @@ private fun validate(request: PushRequest, now: Long) {
             throw BadRequestException("Fecha de modificación imposible en ${ch.table}/${ch.id}: revisa la hora del móvil")
         }
         if (ch.deletedAt != null && ch.deletedAt < 1) throw BadRequestException("deletedAt no válido en ${ch.table}/${ch.id}")
-        if (ch.data.toString().length > MAX_RECORD_BYTES) throw BadRequestException("Registro demasiado grande: ${ch.table}/${ch.id}")
+        if (ch.data.toString().toByteArray(Charsets.UTF_8).size > MAX_RECORD_BYTES) throw BadRequestException("Registro demasiado grande: ${ch.table}/${ch.id}")
+        // El id del contenido debe ser el del registro: así un cliente no puede colar una fila bajo otro id
+        val inner = (ch.data["id"] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content
+        if (inner != null && !inner.equals(ch.id, ignoreCase = true)) throw BadRequestException("El id del contenido no coincide con el del registro en ${ch.table}/${ch.id}")
     }
 }

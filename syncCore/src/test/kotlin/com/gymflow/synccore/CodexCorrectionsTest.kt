@@ -224,4 +224,24 @@ class CodexCorrectionsTest {
         assertEquals(SqlValue.Real(80.5), SqlValues.toSql("workouts", "bodyweightKg", "REAL", JsonPrimitive(80.5)))
         assertEquals(SqlValue.Null, SqlValues.toSql("workouts", "notes", "TEXT", JsonNull))
     }
+
+    // ───────────── parser: unidades, tamaño de agregado, tipo de fecha ─────────────
+
+    @Test fun `parser - unidades distintas de kg cm s invalidan el archivo`() {
+        val json = exportJson(workoutRecs(1)).replace("\"weight\":\"kg\"", "\"weight\":\"lb\"")
+        val ex = assertFailsWith<ImportFileException> { ExportParser.parse(json.toByteArray(), UID) }
+        assertEquals(ImportError.BAD_FIELD, ex.code)
+    }
+
+    @Test fun `parser - un registro con demasiadas filas se marca invalido sin tumbar el resto`() {
+        val big = workoutRecs(1, exCount = 2, setCount = 3) + workoutRecs(2, exCount = 1, setCount = 1)
+        val parsed = ExportParser.parse(exportJson(big).toByteArray(), UID, ImportLimits(maxRowsPerAggregate = 5))
+        assertEquals(1, parsed.invalid.size); assertEquals(1, parsed.aggregates.size)
+    }
+
+    @Test fun `parser - updatedAt numerico es un registro invalido y no se acepta como fecha`() {
+        val json = exportJson(workoutRecs(1)).replaceFirst(Regex("\"updatedAt\":\"[^\"]+\""), "\"updatedAt\":12345")
+        val parsed = ExportParser.parse(json.toByteArray(), UID)
+        assertEquals(1, parsed.invalid.size); assertEquals(0, parsed.aggregates.size)
+    }
 }

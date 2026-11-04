@@ -49,6 +49,8 @@ data class ImportLimits(
     val maxCustomExercises: Int = 5_000,
     val maxAchievements: Int = 500,
     val maxString: Int = 20_000,
+    /** Un agregado debe caber en UNA petición atómica del servidor (máx. 2000 cambios). */
+    val maxRowsPerAggregate: Int = 1_500,
 )
 
 private class ItemException(message: String) : Exception(message)
@@ -82,6 +84,15 @@ object ExportParser {
         if (schema != SCHEMA_VERSION.toLong()) throw ImportFileException(ImportError.UNSUPPORTED_SCHEMA, "Versión de copia $schema no compatible (se admite $SCHEMA_VERSION)")
 
         val exportedAt = (obj["exportedAt"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { runCatching { iso(it) }.getOrNull() }
+        // Unidades: si el archivo declara otras, los números significarían otra cosa. Se rechaza el archivo entero.
+        (obj["units"])?.let { u ->
+            val uo = u as? JsonObject ?: throw ImportFileException(ImportError.BAD_FIELD, "«units» debe ser un objeto")
+            for ((k, expected) in listOf("weight" to "kg", "length" to "cm", "time" to "s")) {
+                val got = (uo[k] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                if (got != null && got != expected) throw ImportFileException(ImportError.BAD_FIELD, "Unidades no admitidas ($k = $got): solo $expected")
+                if (uo[k] != null && uo[k] !is JsonNull && got == null) throw ImportFileException(ImportError.BAD_FIELD, "Unidad «$k» no válida")
+            }
+        }
         val fileUid = (obj["userId"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.take(200)
 
         fun arr(name: String, max: Int): List<JsonElement> {
@@ -103,6 +114,7 @@ object ExportParser {
                 try {
                     val agg = f(el as? JsonObject ?: throw ItemException("no es un objeto"))
                     if (agg.records.map { it.key }.toSet().size != agg.records.size) throw ItemException("ID repetido dentro del registro")
+                    if (agg.records.size > limits.maxRowsPerAggregate) throw ItemException("demasiadas filas en un solo registro (${agg.records.size})")
                     aggs += agg
                 } catch (e: ItemException) {
                     invalid += ItemIssue(kind, "#$i", e.message ?: "inválido")
@@ -303,7 +315,11 @@ object ExportParser {
         return ms
     }
     private fun time(o: JsonObject, f: String): Long = iso(prim(o, f)?.takeIf { it.isString }?.content ?: throw ItemException("falta «$f» (fecha)"))
-    private fun timeOpt(o: JsonObject, f: String): Long? = prim(o, f)?.takeIf { it.isString }?.content?.let { iso(it) }
+    private fun timeOpt(o: JsonObject, f: String): Long? {
+        val p = prim(o, f) ?: return null
+        if (!p.isString) throw ItemException("«$f» debe ser una fecha en texto")
+        return iso(p.content)
+    }
 
     private fun list(o: JsonObject, f: String, max: Int): List<JsonElement> {
         val v = field(o, f) ?: return emptyList()

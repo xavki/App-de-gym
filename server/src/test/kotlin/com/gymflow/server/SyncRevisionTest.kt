@@ -169,4 +169,19 @@ class SyncRevisionTest {
             assertEquals(c["same"]!!.jsonPrimitive.boolean, got, c["name"]!!.jsonPrimitive.content)
         }
     }
+
+    @Test fun elIdDelContenidoDebeCoincidirConElDelRegistro() = testApplication {
+        val client = setUp(); val token = keys.token(newUid()); val id = uuid()
+        val ok = change("routines", id, 1000, null, buildJsonObject { put("id", id); put("name", "x") }, 0, null)
+        assertEquals(HttpStatusCode.OK, client.push(token, ok).status)
+        val other = change("routines", uuid(), 1000, null, buildJsonObject { put("id", uuid()); put("name", "x") }, 0, null)
+        assertEquals(HttpStatusCode.BadRequest, client.push(token, other).status)
+    }
+
+    @Test fun elTamanoDelRegistroSeMideEnBytesUtf8() = testApplication {
+        val client = setUp(); val token = keys.token(newUid())
+        // 40 000 caracteres de 3 bytes = 120 000 bytes (> 64 KiB) aunque solo sean 40 000 «chars»
+        val big = change("routines", uuid(), 1000, null, buildJsonObject { put("name", "€".repeat(40_000)) }, 0, null)
+        assertEquals(HttpStatusCode.BadRequest, client.push(token, big).status)
+    }
 }
