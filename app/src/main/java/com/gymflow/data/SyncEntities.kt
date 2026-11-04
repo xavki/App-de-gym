@@ -16,8 +16,8 @@ import androidx.room.Upsert
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Última revisión del servidor vista de una fila (la "base" de su próximo cambio). */
-@Entity(tableName = "sync_revs", primaryKeys = ["serverKey", "tableName", "id"])
-data class SyncRevEntity(val serverKey: String, val tableName: String, val id: String, val rev: Long)
+@Entity(tableName = "sync_revs", primaryKeys = ["userId", "serverKey", "tableName", "id"])
+data class SyncRevEntity(val userId: String, val serverKey: String, val tableName: String, val id: String, val rev: Long)
 
 @Entity(tableName = "sync_state", primaryKeys = ["userId", "serverKey"])
 data class SyncStateEntity(

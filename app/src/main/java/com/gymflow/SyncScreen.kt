@@ -125,6 +125,17 @@ fun SyncSection(viewModel: GymFlowViewModel) {
         )
     }
 
+    // H3: se editó este elemento DESPUÉS de detectarse el conflicto; usar el servidor exige una segunda confirmación expresa
+    sync.pendingLocalEditsFor?.let { root ->
+        AlertDialog(
+            onDismissRequest = { sync.pendingLocalEditsFor = null }, containerColor = SurfaceDark,
+            title = { Text("Has editado esto después", color = AccentWhite, fontWeight = FontWeight.Bold) },
+            text = { Text("Cambiaste este elemento después de que se detectara el conflicto. Si usas la versión del servidor, tu última versión queda archivada y recuperable.", color = TextSecondary) },
+            confirmButton = { TextButton(onClick = { sync.resolve(root, keepLocal = false, acknowledgeLocalEdits = true) }) { Text("Usar el servidor", color = AccentCyan) } },
+            dismissButton = { TextButton(onClick = { sync.pendingLocalEditsFor = null }) { Text("Cancelar", color = TextSecondary) } }
+        )
+    }
+
     OnboardingDialog(sync)
 
     pairingCode?.let { code ->

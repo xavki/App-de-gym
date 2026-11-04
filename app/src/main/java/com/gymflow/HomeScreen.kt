@@ -632,6 +632,7 @@ fun ProfileScreen(
             Spacer(Modifier.height(24.dp))
             ImportDataSection()
         }
+        item { LegacyFirestoreImportCard(viewModel) }
 
         // ── Botón cerrar sesión ─────────────────────────────────────────────
         item {

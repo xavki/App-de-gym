@@ -2,6 +2,7 @@ package com.gymflow
 
 import android.app.Application
 import android.net.Uri
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,6 +13,7 @@ import com.gymflow.sync.SyncService
 import com.gymflow.sync.SyncStatus
 import com.gymflow.synccore.ConflictGroup
 import com.gymflow.synccore.ConflictResolver
+import com.gymflow.synccore.IdentityChangedException
 import com.gymflow.synccore.ImportChoices
 import com.gymflow.synccore.ImportFileException
 import com.gymflow.synccore.ImportPlan
@@ -28,6 +30,19 @@ import kotlinx.coroutines.launch
 
 /** Estado de las pantallas Perfil → Importar datos y Perfil → Sincronización. Nunca se muestra éxito sin una verificación real. */
 class ImportSyncViewModel(app: Application) : AndroidViewModel(app) {
+
+    // H1: si cambia la cuenta (o se cierra sesión), toda vista previa pendiente deja de ser válida y se descarta sin aplicar nada.
+    private val authListener = FirebaseAuth.AuthStateListener {
+        importUi = ImportUi.Idle; importChoices = ImportChoices(); onboardUi = OnboardUi.Idle; copySavedOutside = false
+        status = SyncStatus(false, false, null, null, 0); conflicts = emptyList(); pendingLocalEditsFor = null
+        message = "La cuenta cambió: se descartó la operación pendiente. No se modificó nada."
+    }
+    private var firstAuthEvent = true
+    init {
+        FirebaseAuth.getInstance().addAuthStateListener { auth ->
+            if (firstAuthEvent) { firstAuthEvent = false } else authListener.onAuthStateChanged(auth)
+        }
+    }
 
     // ───────────── importación ─────────────
     sealed interface ImportUi {
@@ -121,9 +136,13 @@ class ImportSyncViewModel(app: Application) : AndroidViewModel(app) {
 
     fun closeOnboarding() { onboardUi = OnboardUi.Idle; copySavedOutside = false; refresh() }
 
-    fun resolve(root: Key, keepLocal: Boolean) {
+    /** Conflicto cuya resolución «usar servidor» espera una segunda confirmación porque se editó localmente después (H3). */
+    var pendingLocalEditsFor by mutableStateOf<Key?>(null)
+
+    fun resolve(root: Key, keepLocal: Boolean, acknowledgeLocalEdits: Boolean = false) {
         viewModelScope.launch {
-            try { SyncService.resolve(getApplication(), root, keepLocal); message = if (keepLocal) "Se conserva la versión de este móvil." else "Se usa la versión del servidor (la tuya queda archivada)." }
+            try { SyncService.resolve(getApplication(), root, keepLocal, acknowledgeLocalEdits); pendingLocalEditsFor = null; message = if (keepLocal) "Se conserva la versión de este móvil." else "Se usa la versión del servidor (la tuya queda archivada)." }
+            catch (e: ConflictResolver.LocalChangedSinceConflictException) { pendingLocalEditsFor = root; message = e.message }
             catch (e: ConflictResolver.NotResolvableException) { message = e.message }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { message = friendly(e) }
@@ -137,6 +156,7 @@ class ImportSyncViewModel(app: Application) : AndroidViewModel(app) {
         is StaleImportPlanException -> e.message ?: "Los datos cambiaron: vuelve a analizar."
         is ImportIntegrityException -> "La verificación posterior falló y no se guardó nada."
         is OnboardingBlockedException -> e.message ?: "Incorporación bloqueada."
+        is IdentityChangedException -> "La cuenta o el servidor cambiaron durante la operación. No se aplicó nada: vuelve a empezar."
         is RemoteException -> SyncManager.describe(e.kind)
         is SyncService.NoSessionException -> "Inicia sesión para continuar."
         is IllegalArgumentException -> "No hay nada que aplicar con estas opciones."

@@ -125,8 +125,6 @@ class GymFlowViewModel(
                 viewModelScope.launch {
                     savePendingFinishes(user.uid)   // entrenos finalizados que no llegaron a Room
                     loadAll()   // lo local aparece al instante
-                    FirestoreImporter.importUserDataIfNeeded(appContext, repo, db, user.uid)
-                    loadAll()
                     SyncManager.schedule(appContext)
                     refreshPending()
                 }
@@ -144,6 +142,22 @@ class GymFlowViewModel(
             }
         }
     }
+
+    // ─── Datos antiguos de Firestore: SOLO con consentimiento explícito (H6) ───
+    var legacyImportState by mutableStateOf<String?>(null)
+        private set
+    fun legacyImportOffered(): Boolean = auth.currentUser?.uid?.let { FirestoreImporter.isOffered(appContext, it) } == true
+    /** Se llama únicamente desde el botón + diálogo de confirmación de Perfil → Importar datos. */
+    fun importLegacyFirestore() {
+        val uid = auth.currentUser?.uid ?: return
+        legacyImportState = "Importando…"
+        viewModelScope.launch {
+            val ok = FirestoreImporter.importUserDataWithConsent(appContext, repo, db, uid, FirestoreImporter.LegacyConsent.grant(uid)) { auth.currentUser?.uid == uid }
+            loadAll()
+            legacyImportState = if (ok) "Datos antiguos importados." else "No se pudo completar. No se guardó nada a medias; puedes reintentar."
+        }
+    }
+    fun dismissLegacyMessage() { legacyImportState = null }
 
     private fun loadAll() {
         loadRoutines()
@@ -190,14 +204,14 @@ class GymFlowViewModel(
 
     /** Código para vincular el panel web (caduca en 10 minutos). */
     fun createPairingCode(onResult: (String?) -> Unit) {
-        val api = SyncManager.api(appContext) ?: return onResult(null)
+        val api = SyncManager.api(appContext, auth.currentUser?.uid ?: return onResult(null)) ?: return onResult(null)
         viewModelScope.launch {
             onResult(try { api.pairingCode().code } catch (e: Exception) { errorMessage = "No se pudo pedir el código: ${e.message}"; null })
         }
     }
 
     fun revokePanels(onResult: (Int?) -> Unit) {
-        val api = SyncManager.api(appContext) ?: return onResult(null)
+        val api = SyncManager.api(appContext, auth.currentUser?.uid ?: return onResult(null)) ?: return onResult(null)
         viewModelScope.launch {
             onResult(try { api.revokePanels().revoked } catch (e: Exception) { errorMessage = "No se pudo desvincular: ${e.message}"; null })
         }

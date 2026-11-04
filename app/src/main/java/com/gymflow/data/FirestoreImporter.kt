@@ -56,90 +56,72 @@ object FirestoreImporter {
         }
     }
 
-    /** Copia a Room los datos del usuario en Firestore. Solo se marca como hecho si todo va bien. */
-    suspend fun importUserDataIfNeeded(context: Context, repo: GymRepository, db: FirebaseFirestore, uid: String) {
+    /**
+     * Permiso EXPLÍCITO del usuario para leer SUS datos antiguos de Firestore. Solo se obtiene con [LegacyConsent.grant], que se llama
+     * únicamente desde una acción de pantalla (botón + diálogo). Nada en el arranque ni en el login puede fabricarlo (ver LegacyImportGuardTest).
+     */
+    class LegacyConsent private constructor(val uid: String) {
+        companion object { fun grant(uid: String) = LegacyConsent(uid) }
+    }
+
+    /** ¿Hay algo que ofrecer? (no se ha importado ya para esta cuenta). No lee Firestore. */
+    fun isOffered(context: Context, uid: String): Boolean = !prefs(context).getBoolean("firestore_import_done_$uid", false)
+
+    /**
+     * Copia a Room los datos del usuario en Firestore. Requiere [consent] de ESA cuenta y que la cuenta activa siga siendo la misma.
+     * Dos fases: (1) se lee TODO desde el servidor sin tocar Room; (2) se guarda. Si la lectura falla no se escribe nada.
+     * Los ids de Firestore se convierten en UUID estables y lo que ya existe se salta → reintentar o importar antes/después de la
+     * sincronización no duplica. Lo importado lleva la fecha antigua IMPORTED_AT para que cualquier edición real gane.
+     */
+    suspend fun importUserDataWithConsent(context: Context, repo: GymRepository, db: FirebaseFirestore, uid: String, consent: LegacyConsent, stillActive: () -> Boolean): Boolean {
+        require(consent.uid == uid) { "El consentimiento es de otra cuenta" }
         val key = "firestore_import_done_$uid"
-        if (prefs(context).getBoolean(key, false)) return
+        if (prefs(context).getBoolean(key, false)) return true
         try {
-            // Source.SERVER: sin conexión Firestore devolvería su caché (quizá vacía)
-            // y daríamos la importación por hecha sin haber traído nada
+            if (!stillActive()) return false
+            ensureCatalog(repo, db)                 // catálogo global (no es dato personal), para enlazar exerciseId por nombre
             val user = db.collection("users").document(uid)
-
-            // Catálogo primero, para poder enlazar exerciseId por nombre
-            ensureCatalog(repo, db)
-
-            // Reglas para no pisar nunca datos más nuevos (p. ej. ya sincronizados desde
-            // otro móvil): se salta lo que ya existe, y lo importado lleva una fecha de
-            // modificación antigua (IMPORTED_AT) para que cualquier edición real gane.
+            // FASE 1: lectura completa. Source.SERVER: sin conexión Firestore devolvería su caché (quizá vacía)
+            val customs = user.collection("custom_exercises").get(Source.SERVER).await().toObjects(CustomExercise::class.java)
+            val routines = user.collection("routines").get(Source.SERVER).await().toObjects(WorkoutSession::class.java)
+            val workouts = user.collection("workout_history").get(Source.SERVER).await().documents
+            val measures = user.collection("body_measurements").get(Source.SERVER).await().toObjects(BodyMeasurement::class.java)
+            val schedules = user.collection("schedules").get(Source.SERVER).await().documents
+            val achievements = user.collection("achievements").get(Source.SERVER).await().documents
+            if (!stillActive()) return false         // la cuenta cambió mientras se leía: no se guarda nada
+            // FASE 2: guardado (con ids estables y sin pisar lo existente)
             val old = GymRepository.IMPORTED_AT
             val id = GymRepository::stableUuid
-
-            user.collection("custom_exercises").get(Source.SERVER).await()
-                .toObjects(CustomExercise::class.java)
-                .map { it.copy(id = id(it.id)) }
-                .filterNot { repo.hasExercise(it.id) }
-                .forEach { repo.saveCustomExercise(uid, it, at = old) }
-
-            user.collection("routines").get(Source.SERVER).await()
-                .toObjects(WorkoutSession::class.java)
-                .map { it.copy(id = id(it.id)) }
-                .filterNot { repo.hasRoutine(it.id) }
-                .forEach { repo.saveRoutine(uid, it, at = old) }
-
-            // El id de Firestore se convierte en UUID estable → reimportar no duplica.
-            // Los entrenos ya llevan su fecha real (antigua) como fecha de modificación.
-            user.collection("workout_history").get(Source.SERVER).await().documents.forEach { doc ->
+            customs.map { it.copy(id = id(it.id)) }.filterNot { repo.hasExercise(it.id) }.forEach { repo.saveCustomExercise(uid, it, at = old) }
+            routines.map { it.copy(id = id(it.id)) }.filterNot { repo.hasRoutine(it.id) }.forEach { repo.saveRoutine(uid, it, at = old) }
+            workouts.forEach { doc ->
                 val w = doc.toObject(WorkoutSession::class.java) ?: return@forEach
                 val workoutId = id(doc.id)
                 if (repo.hasWorkout(workoutId)) return@forEach
-                repo.saveWorkout(
-                    uid = uid, session = w, routineId = null,
-                    workoutId = workoutId,
-                    startedAt = w.date.time, onlyLoggedSets = false, createdAt = w.date.time
-                )
+                repo.saveWorkout(uid = uid, session = w, routineId = null, workoutId = workoutId, startedAt = w.date.time, onlyLoggedSets = false, createdAt = w.date.time)
             }
-
-            user.collection("body_measurements").get(Source.SERVER).await()
-                .toObjects(BodyMeasurement::class.java)
-                .map { it.copy(id = id(it.id)) }
-                .filterNot { repo.hasMeasurement(it.id) }
-                .forEach { repo.saveMeasurement(uid, it, at = old) }
-
-            user.collection("schedules").get(Source.SERVER).await().documents.forEach { doc ->
+            measures.map { it.copy(id = id(it.id)) }.filterNot { repo.hasMeasurement(it.id) }.forEach { repo.saveMeasurement(uid, it, at = old) }
+            schedules.forEach { doc ->
                 val scheduleId = id(doc.getString("id") ?: doc.id)
                 if (repo.hasSchedule(scheduleId)) return@forEach
                 repo.saveSchedule(uid, ScheduledRoutine(
-                    id             = scheduleId,
-                    routineId      = doc.getString("routineId") ?: "",
-                    routineName    = doc.getString("routineName") ?: "",
-                    startDate      = doc.getLong("startDate") ?: 0L,
-                    hourOfDay      = (doc.getLong("hourOfDay") ?: 8L).toInt(),
-                    minute         = (doc.getLong("minute") ?: 0L).toInt(),
-                    recurrenceType = doc.getString("recurrenceType") ?: RecurrenceType.ONCE,
-                    intervalDays   = (doc.getLong("intervalDays") ?: 1L).toInt(),
-                    weekDay        = (doc.getLong("weekDay") ?: 2L).toInt(),
-                    endDate        = doc.getLong("endDate") ?: 0L,
-                    userId         = uid
+                    id = scheduleId, routineId = doc.getString("routineId") ?: "", routineName = doc.getString("routineName") ?: "",
+                    startDate = doc.getLong("startDate") ?: 0L, hourOfDay = (doc.getLong("hourOfDay") ?: 8L).toInt(), minute = (doc.getLong("minute") ?: 0L).toInt(),
+                    recurrenceType = doc.getString("recurrenceType") ?: RecurrenceType.ONCE, intervalDays = (doc.getLong("intervalDays") ?: 1L).toInt(),
+                    weekDay = (doc.getLong("weekDay") ?: 2L).toInt(), endDate = doc.getLong("endDate") ?: 0L, userId = uid
                 ), at = old)
             }
-
-            user.collection("achievements").get(Source.SERVER).await().documents.forEach { doc ->
-                val key = doc.getString("id") ?: return@forEach
-                if (repo.hasAchievement(uid, key)) return@forEach
-                val at = doc.getDate("unlockedAt")?.time ?: old
-                repo.unlockAchievement(uid, key, at)
+            achievements.forEach { doc ->
+                val akey = doc.getString("id") ?: return@forEach
+                if (repo.hasAchievement(uid, akey)) return@forEach
+                repo.unlockAchievement(uid, akey, doc.getDate("unlockedAt")?.time ?: old)
             }
-
             prefs(context).edit().putBoolean(key, true).apply()
-            Log.i(TAG, "Importación desde Firestore completada para $uid")
+            Log.i(TAG, "Importación desde Firestore completada")
+            return true
         } catch (e: Exception) {
-            // Se reintentará en el próximo arranque; lo ya importado se salta
-            Log.w(TAG, "Importación incompleta: ${e.message}")
+            Log.w(TAG, "Importación incompleta (se puede reintentar)")
+            return false
         }
     }
-}
-
-private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
-    addOnSuccessListener { cont.resume(it) }
-    addOnFailureListener { cont.resumeWithException(it) }
 }

@@ -16,6 +16,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.gymflow.BuildConfig
 import com.gymflow.data.GymDatabase
 import com.gymflow.synccore.Content
+import com.gymflow.synccore.OperationIdentity
 import com.gymflow.synccore.RemoteException
 import com.gymflow.synccore.ServerUrl
 import com.gymflow.synccore.SyncOutcome
@@ -77,26 +78,41 @@ object SyncManager {
 
     fun currentUid(): String? = FirebaseAuth.getInstance().currentUser?.uid
 
-    /** Cliente del servidor para el usuario con sesión, o null si no hay servidor o sesión. */
-    fun api(context: Context): HttpSyncApi? {
+    /** Identidad VIVA ahora mismo: cuenta de Firebase + servidor configurado (null si falta alguna). */
+    fun liveIdentity(context: Context): String? {
+        val uid = currentUid() ?: return null
+        if (!isConfigured(context)) return null
+        return OperationIdentity.of(uid, serverKey(context))
+    }
+
+    /**
+     * Cliente del servidor ATADO a la cuenta [expectedUid] (la de la operación). Si la sesión cambia, ni se pide token ni se envía nada;
+     * y si cambia mientras se pedía el token, el token de la cuenta nueva se descarta. Nunca viaja un token de otra cuenta.
+     */
+    fun api(context: Context, expectedUid: String): HttpSyncApi? {
         val url = serverUrl(context).takeIf { it.isNotBlank() } ?: return null
-        FirebaseAuth.getInstance().currentUser ?: return null
+        if (currentUid() != expectedUid) return null
         return HttpSyncApi(url, token = { force ->
             val user = FirebaseAuth.getInstance().currentUser ?: throw RemoteException(RemoteException.Kind.AUTH, "Sin sesión")
-            user.getIdToken(force).await().token ?: throw RemoteException(RemoteException.Kind.AUTH, "Sin token de Firebase")
+            if (user.uid != expectedUid) throw RemoteException(RemoteException.Kind.IDENTITY, "La cuenta cambió")
+            val t = user.getIdToken(force).await().token ?: throw RemoteException(RemoteException.Kind.AUTH, "Sin token de Firebase")
+            if (FirebaseAuth.getInstance().currentUser?.uid != expectedUid) throw RemoteException(RemoteException.Kind.IDENTITY, "La cuenta cambió")
+            t
         }, allowInsecureLocal = BuildConfig.DEBUG)
     }
 
+    /** Almacén ligado a la cuenta y servidor de AHORA; su identidad viva se vuelve a consultar en cada paso. */
     fun store(context: Context): RoomSyncStore? {
         val uid = currentUid() ?: return null
         if (!isConfigured(context)) return null
-        return RoomSyncStore(GymDatabase.get(context), uid, serverKey(context))
+        val appCtx = context.applicationContext
+        return RoomSyncStore(GymDatabase.get(context), uid, serverKey(context)) { liveIdentity(appCtx) }
     }
 
     /** Sincroniza ahora (en la corrutina que llama). null = no hay servidor o sesión. */
     suspend fun syncNow(context: Context): SyncOutcome? {
         val store = store(context) ?: return null
-        val api = api(context) ?: return null
+        val api = api(context, currentUid() ?: return null) ?: return null
         _state.value = SyncState.Running
         val outcome = SyncRunner(store, api).run()
         _state.value = when (outcome) {
@@ -111,7 +127,7 @@ object SyncManager {
         RemoteException.Kind.NETWORK -> "Sin conexión con el servidor. Se reintentará."
         RemoteException.Kind.SERVER -> "El servidor no responde correctamente. Se reintentará."
         RemoteException.Kind.AUTH -> "La sesión ha caducado. Vuelve a iniciar sesión."
-        RemoteException.Kind.IDENTITY -> "El servidor no acepta esta cuenta."
+        RemoteException.Kind.IDENTITY -> "La cuenta o el servidor cambiaron durante la operación. No se aplicó nada."
         RemoteException.Kind.REJECTED -> "El servidor rechazó los datos. Revisa la versión de la app."
     }
 

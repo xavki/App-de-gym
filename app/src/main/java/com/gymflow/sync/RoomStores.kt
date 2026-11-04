@@ -7,6 +7,8 @@ import com.gymflow.data.SyncConflictEntity
 import com.gymflow.data.SyncStateEntity
 import com.gymflow.synccore.ConflictCodec
 import com.gymflow.synccore.ConflictGroup
+import com.gymflow.synccore.Identified
+import com.gymflow.synccore.OperationIdentity
 import com.gymflow.synccore.Key
 import com.gymflow.synccore.Rec
 import com.gymflow.synccore.RecStore
@@ -17,7 +19,13 @@ import com.gymflow.synccore.SyncTx
 import java.util.UUID
 
 /** Base local (Room) para el motor de sincronización del núcleo. Cada transacción es de Room: todo o nada. */
-class RoomSyncStore(private val db: GymDatabase, private val uid: String, private val serverKey: String) : SyncStore {
+class RoomSyncStore(
+    private val db: GymDatabase, private val uid: String, private val serverKey: String,
+    /** Identidad VIVA (sesión de Firebase + servidor configurado AHORA); null = sin sesión o sin servidor. */
+    private val live: () -> String?,
+) : SyncStore {
+    override val boundIdentity: String = OperationIdentity.of(uid, serverKey)
+    override fun liveIdentity(): String? = live()
 
     override suspend fun <T> transaction(block: suspend SyncTx.() -> T): T = db.withTransaction {
         Tx(RoomRecordAccess(db.openHelper.writableDatabase, uid, serverKey), db, uid, serverKey).block()
@@ -52,7 +60,12 @@ class RoomSyncStore(private val db: GymDatabase, private val uid: String, privat
 }
 
 /** Base local (Room) para la importación JSON. Las inserciones nunca sobrescriben: si la fila existe, falla y se revierte todo. */
-class RoomImportStore(private val db: GymDatabase, private val uid: String, private val serverKey: String) : RecStore {
+class RoomImportStore(
+    private val db: GymDatabase, private val uid: String, private val serverKey: String,
+    private val live: () -> String?,
+) : RecStore {
+    override val boundIdentity: String = OperationIdentity.of(uid, serverKey)
+    override fun liveIdentity(): String? = live()
 
     override suspend fun <T> transaction(block: suspend RecTx.() -> T): T = db.withTransaction {
         Tx(RoomRecordAccess(db.openHelper.writableDatabase, uid, serverKey)).block()

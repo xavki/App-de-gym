@@ -132,3 +132,31 @@ internal fun kindName(k: Kind) = when (k) {
     Kind.CUSTOM_EXERCISE -> "Ejercicio"
     Kind.ACHIEVEMENT -> "Logro"
 }
+
+/** Datos antiguos de Firestore (H6): nunca se leen solos; solo si el usuario lo pide y confirma. */
+@Composable
+fun LegacyFirestoreImportCard(viewModel: GymFlowViewModel) {
+    var confirm by remember { mutableStateOf(false) }
+    val message = viewModel.legacyImportState
+    if (!viewModel.legacyImportOffered() && message == null) return
+    Spacer(Modifier.height(16.dp))
+    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Datos de la versión anterior (nube antigua)", color = AccentWhite, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Text("Si usabas GymFlow con la nube antigua, puedes traer esos datos a este móvil. Solo ocurre si lo pides aquí. " +
+                "No se sobrescribe nada de lo que ya tengas.", color = TextSecondary, fontSize = 13.sp)
+            if (message != null) { Spacer(Modifier.height(8.dp)); Text(message, color = AccentCyan, fontSize = 13.sp) }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = { confirm = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentCyan)) { Text("Importar datos antiguos") }
+        }
+    }
+    if (confirm) AlertDialog(
+        onDismissRequest = { confirm = false }, containerColor = SurfaceDark,
+        title = { Text("¿Importar datos antiguos?", color = AccentWhite, fontWeight = FontWeight.Bold) },
+        text = { Text("Se leerán tus datos antiguos de la nube de tu cuenta actual y se añadirán a este móvil sin sobrescribir nada.", color = TextSecondary) },
+        confirmButton = { TextButton(onClick = { confirm = false; viewModel.importLegacyFirestore() }) { Text("Importar", color = AccentCyan) } },
+        dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancelar", color = TextSecondary) } }
+    )
+}

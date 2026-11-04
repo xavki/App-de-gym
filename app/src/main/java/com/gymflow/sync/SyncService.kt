@@ -39,15 +39,19 @@ object SyncService {
 
     // ───────────── importación JSON ─────────────
 
-    private fun importStore(ctx: Context) = RoomImportStore(GymDatabase.get(ctx), uid(), SyncManager.serverKey(ctx))
+    private fun importStore(ctx: Context): RoomImportStore {
+        val app = ctx.applicationContext
+        return RoomImportStore(GymDatabase.get(ctx), uid(), SyncManager.serverKey(ctx)) { SyncManager.liveIdentity(app) }
+    }
 
     /** Lee el archivo (con tope de tamaño), lo valida y compara con la base actual. NO escribe nada. */
     suspend fun planImport(ctx: Context, uri: Uri): ImportPlan {
         val uid = uid()
         val bytes = withContext(Dispatchers.IO) { readBounded(ctx, uri, ImportLimits().maxBytes) }
         val parsed = ExportParser.parse(bytes, uid)
-        val local = importStore(ctx).transaction { all() }
-        return ImportPlanner.plan(parsed, local, uid)
+        val store = importStore(ctx)                       // identidad = (cuenta, servidor) de ESTE momento; el plan la lleva consigo (H1)
+        val local = store.transaction { all() }
+        return ImportPlanner.plan(parsed, local, uid, ownerIdentity = store.boundIdentity)
     }
 
     /** Aplica en UNA transacción (todo o nada); falla con StaleImportPlanException si la base cambió desde la vista previa. */
@@ -77,8 +81,10 @@ object SyncService {
 
     /** SOLO LEE (local y servidor) y prepara la vista previa. No cambia nada, no sube nada. */
     suspend fun prepareOnboarding(ctx: Context): OnboardingPlan {
-        val api = SyncManager.api(ctx) ?: throw IllegalStateException("Configura el servidor e inicia sesión")
-        return Onboarding.prepare(syncStore(ctx), api)
+        val store = syncStore(ctx)
+        val uid = SyncManager.currentUid() ?: throw NoSessionException()
+        val api = SyncManager.api(ctx, uid) ?: throw IllegalStateException("Configura el servidor e inicia sesión")
+        return Onboarding.prepare(store, api)
     }
 
     /**
@@ -128,10 +134,11 @@ object SyncService {
 
     suspend fun conflicts(ctx: Context): List<ConflictGroup> = syncStore(ctx).transaction { conflicts() }
 
-    suspend fun resolve(ctx: Context, root: Key, keepLocal: Boolean) {
+    /** [acknowledgeLocalEdits]: el usuario confirmó de nuevo sabiendo que sus ediciones posteriores al conflicto se archivan (H3). */
+    suspend fun resolve(ctx: Context, root: Key, keepLocal: Boolean, acknowledgeLocalEdits: Boolean = false) {
         val store = syncStore(ctx)
         if (keepLocal) ConflictResolver.keepLocal(store, root, System.currentTimeMillis())
-        else ConflictResolver.useRemote(store, root, System.currentTimeMillis())
+        else ConflictResolver.useRemote(store, root, System.currentTimeMillis(), acknowledgeLocalEdits)
         SyncManager.requestSync(ctx)
     }
 }

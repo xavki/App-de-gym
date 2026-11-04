@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.gymflow.BodyMeasurement
 import com.gymflow.data.GymDatabase
 import com.gymflow.data.GymRepository
+import com.gymflow.synccore.OperationIdentity
 import com.gymflow.synccore.Content
 import com.gymflow.synccore.ExportParser
 import com.gymflow.synccore.ImportChoices
@@ -44,8 +45,8 @@ class RoomStoresTest {
 
     @After fun tearDown() = db.close()
 
-    private fun store(user: String = uid) = RoomImportStore(db, user, "srv")
-    private fun syncStore(user: String = uid) = RoomSyncStore(db, user, "srv")
+    private fun store(user: String = uid) = RoomImportStore(db, user, "srv") { OperationIdentity.of(user, "srv") }
+    private fun syncStore(user: String = uid) = RoomSyncStore(db, user, "srv") { OperationIdentity.of(user, "srv") }
 
     private fun measurement(id: String, user: String, weight: Double = 80.5) = BodyMeasurement(id = id, userId = user, weight = weight)
 
@@ -85,5 +86,31 @@ class RoomStoresTest {
         val existing = st.transaction { all() }.first()
         assertTrue(runCatching { st.transaction { insert(existing) } }.isFailure)      // insertar algo que ya existe falla y se revierte
         assertEquals(1, st.transaction { all() }.size)
+    }
+
+    // ─── H1/H2/H5 (PENDIENTES DE EJECUCIÓN en emulador desechable) ───
+
+    @Test fun anotherAccountsRowWithTheSameIdIsNeverReplaced() = runBlocking {
+        val id = "55555555-5555-5555-5555-555555555555"
+        repo.saveMeasurement("otro", measurement(id, "otro", weight = 70.0))
+        val mine = Rec(Tables.BODY_MEASUREMENTS, id, null, buildJsonObject {
+            put("id", id); put("userId", uid); put("measuredAt", 1000L)
+            for (f in listOf("weightKg", "bodyFatPct", "chestCm", "waistCm", "hipsCm", "bicepCm", "thighCm")) put(f, 99.0)
+            put("createdAt", 1000L); put("updatedAt", 1000L); put("deletedAt", JsonNull)
+        }, rev = 0, dirty = true)
+        assertTrue(runCatching { syncStore().transaction { put(mine) } }.isFailure)
+        assertEquals(70.0, store("otro").transaction { all() }.single().data["weightKg"].let { (it as JsonPrimitive).content.toDouble() }, 0.0)
+        assertTrue(store().transaction { all() }.isEmpty())
+    }
+
+    @Test fun identityChangeBeforeConfirmationWritesNothing() = runBlocking {
+        var live: String? = OperationIdentity.of(uid, "srv")
+        val st = RoomImportStore(db, uid, "srv") { live }
+        val json = """{"schemaVersion":1,"userId":"$uid","bodyMeasurements":[
+            {"id":"66666666-6666-6666-6666-666666666666","measuredAt":"2026-01-01T00:00:00Z","weightKg":80.0,"bodyFatPct":15.0,"chestCm":100.0,"waistCm":85.0,"hipsCm":95.0,"bicepCm":35.0,"thighCm":55.0}]}"""
+        val plan = ImportPlanner.plan(ExportParser.parse(json.toByteArray(), uid), st.transaction { all() }, uid, ownerIdentity = st.boundIdentity)
+        live = OperationIdentity.of("otra-cuenta", "srv")            // la sesión cambió tras la vista previa
+        assertTrue(runCatching { ImportExecutor.apply(st, plan, ImportChoices()) }.isFailure)
+        assertTrue(RoomImportStore(db, uid, "srv") { OperationIdentity.of(uid, "srv") }.transaction { all() }.isEmpty())
     }
 }
