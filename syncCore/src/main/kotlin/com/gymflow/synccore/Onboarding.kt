@@ -49,6 +49,8 @@ enum class OAction { UPLOAD, DOWNLOAD, ADOPT, HARMONIZE, CONFLICT }
 data class OItem(val root: Key, val label: String, val action: OAction, val rows: Int, val note: String? = null)
 
 class OnboardingPlan internal constructor(
+    /** Cuenta+servidor para los que se preparó (H1). */
+    val ownerIdentity: String,
     val localFingerprint: String,
     val remoteCursor: Long,
     val items: List<OItem>,
@@ -75,7 +77,9 @@ data class OnboardingResult(val uploaded: Int, val downloaded: Int, val adopted:
  */
 object Onboarding {
     suspend fun prepare(store: SyncStore, remote: RemoteApi, pageSize: Int = 500): OnboardingPlan {
-        val local = store.transaction { records() }
+        val identity = store.boundIdentity
+        store.requireSame(identity)
+        val local = store.transaction { store.requireSame(identity); records() }
         val remoteRecs = mutableListOf<RemoteRecord>()
         var cursor = 0L; var guard = 0
         do {
@@ -85,10 +89,11 @@ object Onboarding {
             cursor = page.cursor
         } while (page.hasMore && guard++ < 100_000)
         val remoteLatest = remoteRecs.groupBy { Key(it.table, it.id) }.mapValues { (_, v) -> v.maxBy { it.version } }   // por si una fila aparece en dos páginas
-        return compare(local, remoteLatest.values.toList(), cursor)
+        store.requireSame(identity)                                  // la cuenta no cambió mientras se leía el servidor
+        return compare(local, remoteLatest.values.toList(), cursor, identity)
     }
 
-    internal fun compare(local: List<Rec>, remote: List<RemoteRecord>, cursor: Long): OnboardingPlan {
+    internal fun compare(local: List<Rec>, remote: List<RemoteRecord>, cursor: Long, identity: String): OnboardingPlan {
         val lIdx = RecIndex(local)
         val remoteRecs = remote.map { it.toRec() }
         val rIdx = RecIndex(remoteRecs)
@@ -141,7 +146,7 @@ object Onboarding {
         val dupNames = names.filterNotNull().groupingBy { it }.eachCount().count { it.value > 1 }
         val ids = (local.filter { it.table == Tables.ROUTINES && !it.deleted }.map { it.id } + remoteRecs.filter { it.table == Tables.ROUTINES && !it.deleted }.map { it.id }).toSet()
         if (ids.size > names.filterNotNull().toSet().size) warnings += "Hay rutinas con el mismo nombre y distinto id ($dupNames nombre(s) repetido(s)): se conservan todas, sin fusionarlas automáticamente."
-        return OnboardingPlan(Content.fingerprint(local), cursor, items, conflicts, warnings, uploads, downloads, adopts, removals, remoteByKey, local.size)
+        return OnboardingPlan(identity, Content.fingerprint(local), cursor, items, conflicts, warnings, uploads, downloads, adopts, removals, remoteByKey, local.size)
     }
 
     private fun harmonizable(root: Key, lm: Map<Key, Rec>, rm: Map<Key, Rec>, lIdx: RecIndex, rIdx: RecIndex): Boolean {
@@ -157,11 +162,13 @@ object Onboarding {
     }
 
     suspend fun apply(store: SyncStore, plan: OnboardingPlan, backup: BackupProof?): OnboardingResult {
+        store.requireSame(plan.ownerIdentity)                        // H1
         if (backup == null) throw OnboardingBlockedException("No hay una copia recuperable verificada: no se puede incorporar este dispositivo.")
         if (backup.localFingerprint != plan.localFingerprint || backup.rows != plan.localRows)
             throw OnboardingBlockedException("La copia recuperable no corresponde al estado analizado.")
         return SyncLock.mutex.withLock {
             store.transaction {
+                store.requireSame(plan.ownerIdentity)
                 val before = records()
                 if (Content.fingerprint(before) != plan.localFingerprint) throw StaleImportPlanException()
                 if (meta().onboarded) throw OnboardingBlockedException("Este dispositivo ya está incorporado.")
@@ -187,20 +194,52 @@ object Onboarding {
                     if (k !in conflicted && !plan.remoteAll.containsKey(k) && !Content.same(now, old)) throw ImportIntegrityException("Cambió ${k.table}/${k.id}")
                 }
                 for (r in after.byKey.values) Tables.PARENT[r.table]?.let { (pt, f) -> if (after[pt, r.str(f) ?: ""] == null) throw ImportIntegrityException("Padre ausente de ${r.table}/${r.id}") }
+                store.requireSame(plan.ownerIdentity)                        // H1: justo antes de confirmar
                 OnboardingResult(plan.uploads.size, plan.downloads.size, plan.adopts.size, plan.removals.size, plan.conflicts.size)
             }
         }
     }
 }
 
-/** Resolución explícita de conflictos de agregado. Lo descartado se archiva (recuperable); nada se pierde. */
+/** Resolución explícita de conflictos de agregado. Lo descartado se archiva ANTES de descartarlo (recuperable); nada se pierde. */
 object ConflictResolver {
     class NotResolvableException(message: String) : Exception(message)
 
+    /** Hubo ediciones locales DESPUÉS de detectarse el conflicto: hay que confirmar de nuevo sabiendo que se archivan. */
+    class LocalChangedSinceConflictException(val changedKeys: List<Key>) :
+        Exception("Has editado esto después de que se detectara el conflicto. Confirma de nuevo: tu última versión quedará archivada.")
+
+    private suspend fun SyncTx.group(root: Key): ConflictGroup {
+        val g = conflicts().firstOrNull { it.root == root } ?: throw NotResolvableException("No hay conflicto abierto")
+        if (!g.complete) throw NotResolvableException("Aún no se han descargado todas las versiones del servidor: sincroniza de nuevo")
+        return g
+    }
+
+    /** Filas cuyo estado local ACTUAL difiere del que se guardó al detectar el conflicto (o filas nuevas pendientes añadidas después). */
+    private fun editedSince(g: ConflictGroup, cur: RecIndex): List<Key> {
+        val agg = cur.aggregate(g.root).associateBy { it.key }
+        val then = g.items.associateBy { Key(it.table, it.id) }
+        val out = mutableListOf<Key>()
+        for ((k, item) in then) {
+            val now = agg[k]; val before = item.local
+            if (before == null && now != null) out += k
+            else if (before != null && (now == null || !Content.same(now, before))) out += k
+        }
+        for ((k, now) in agg) if (k !in then && now.dirty) out += k
+        return out
+    }
+
+    /** Estado LOCAL ACTUAL completo del agregado, tal como está en este momento, junto con las versiones del servidor del conflicto. */
+    private fun currentSnapshot(g: ConflictGroup, cur: RecIndex): ConflictGroup {
+        val byKey = g.items.associateBy { Key(it.table, it.id) }
+        val keys = (byKey.keys + cur.aggregate(g.root).map { it.key }).toList()
+        return g.copy(items = keys.map { k -> ConflictItem(k.table, k.id, cur.byKey[k], byKey[k]?.remote) })
+    }
+
     suspend fun keepLocal(store: SyncStore, root: Key, now: Long) = SyncLock.mutex.withLock {
         store.transaction {
-            val g = conflicts().firstOrNull { it.root == root } ?: throw NotResolvableException("No hay conflicto abierto")
-            if (!g.complete) throw NotResolvableException("Aún no se han descargado todas las versiones del servidor: sincroniza de nuevo")
+            store.requireSame(store.boundIdentity)
+            val g = group(root)
             val cur = RecIndex(records())
             for (item in g.items.associateBy { Key(it.table, it.id) }.values) {
                 val l = cur.byKey[Key(item.table, item.id)]
@@ -211,27 +250,44 @@ object ConflictResolver {
                     r != null && r.deletedAt == null -> put(Rec(r.table, r.id, now, tombstone(r, now), r.rev, dirty = true))   // solo en el servidor: se retira para converger a lo local
                 }
             }
-            archive(g, "KEEP_LOCAL", now); removeConflict(root)
+            archive(g, "KEEP_LOCAL", now); removeConflict(root)       // lo descartado aquí es la versión del servidor: queda en el grupo archivado
         }
     }
 
-    suspend fun useRemote(store: SyncStore, root: Key, now: Long) = SyncLock.mutex.withLock {
+    /**
+     * Usar la versión del servidor. ANTES de sustituir nada se archiva el estado local ACTUAL completo del agregado (no el de cuando se
+     * detectó el conflicto) y, si difiere, también el del momento del conflicto. Si hubo ediciones locales posteriores al conflicto,
+     * exige [acknowledgeLocalEdits] = true (una nueva confirmación expresa del usuario).
+     */
+    suspend fun useRemote(store: SyncStore, root: Key, now: Long, acknowledgeLocalEdits: Boolean = false) = SyncLock.mutex.withLock {
         store.transaction {
-            val g = conflicts().firstOrNull { it.root == root } ?: throw NotResolvableException("No hay conflicto abierto")
-            if (!g.complete) throw NotResolvableException("Aún no se han descargado todas las versiones del servidor: sincroniza de nuevo")
+            store.requireSame(store.boundIdentity)
+            val g = group(root)
             val cur = RecIndex(records())
+            val edited = editedSince(g, cur)
+            if (edited.isNotEmpty() && !acknowledgeLocalEdits) throw LocalChangedSinceConflictException(edited)
+            // 1) archivo del estado local ACTUAL (con todas las filas del agregado) + versiones del servidor del conflicto
+            archive(currentSnapshot(g, cur), "USE_REMOTE", now)
+            // 2) si además se editó después del conflicto, también queda la versión «de cuando se detectó»
+            if (edited.isNotEmpty()) archive(g, "USE_REMOTE_CONFLICT_TIME_LOCAL", now)
+            // 3) ahora sí se sustituye
             val inItems = g.items.map { Key(it.table, it.id) }.toSet()
             for (item in g.items.associateBy { Key(it.table, it.id) }.values) {
                 val r = item.remote
                 if (r != null) put(r.toRec(dirty = false))
-                else cur.byKey[Key(item.table, item.id)]?.let { remove(it.table, it.id) }       // solo existía localmente (archivado abajo)
+                else cur.byKey[Key(item.table, item.id)]?.let { remove(it.table, it.id) }       // solo existía localmente (ya archivado)
             }
-            cur.aggregate(root).filter { it.key !in inItems }.forEach { remove(it.table, it.id) }  // filas locales del agregado que el servidor no tiene
-            archive(g.copy(items = g.items + cur.aggregate(root).filter { it.key !in inItems }.map { ConflictItem(it.table, it.id, it, null) }), "USE_REMOTE", now)
+            cur.aggregate(root).filter { it.key !in inItems }.forEach { remove(it.table, it.id) }  // filas locales del agregado que el servidor no tiene (archivadas)
             removeConflict(root)
         }
     }
 
     private fun tombstone(r: RemoteRecord, now: Long): JsonObject =
         JsonObject(r.data + mapOf("deletedAt" to JsonPrimitive(now), "updatedAt" to JsonPrimitive(now)))
+}
+
+/** Recuperación de lo archivado al resolver un conflicto: las filas locales tal como estaban, listas para volver a escribirse. */
+object ArchiveRecovery {
+    fun localRows(group: ConflictGroup): List<Rec> = group.items.mapNotNull { it.local }
+    fun remoteRows(group: ConflictGroup): List<RemoteRecord> = group.items.mapNotNull { it.remote }
 }

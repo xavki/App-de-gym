@@ -228,13 +228,13 @@ class SyncScenarioTest {
         assertEquals(d.rows.size, second.pushed)
     }
 
-    @Test fun `un corte en la descarga conserva el cursor y continua donde iba`() = runBlocking {
-        val dst = Device("B", emptyList(), server(), pageSize = 7); dst.onboard()          // B ya está incorporado con el servidor vacío…
-        val src = Device("A", (0..5).flatMap { workoutRecs(it) }, server()); src.onboard(); src.run()   // …y luego A sube datos
+    @Test fun `un corte en la descarga no aplica nada a medias y el reintento converge`() = runBlocking {
+        val dst = Device("B", emptyList(), server(), pageSize = 7); dst.onboard()
+        val src = Device("A", (0..5).flatMap { workoutRecs(it) }, server()); src.onboard(); src.run()
         dst.server.failPullAfterPages = 2
         assertTrue(dst.run() is SyncOutcome.Failed)
-        val cursor = dst.store.metaState.cursor; assertTrue(cursor > 0, "el cursor de las páginas ya aplicadas se conserva")
-        val partial = dst.rows.size; assertTrue(partial in 1 until src.rows.size)
+        assertEquals(0, dst.rows.size, "H4: la descarga se aplica entera en una transacción; un corte no deja agregados partidos")
+        assertEquals(0L, dst.store.metaState.cursor)
         assertTrue(dst.run() is SyncOutcome.Success)
         assertEquals(src.contentMap(), dst.contentMap())
     }
@@ -316,6 +316,8 @@ class SyncScenarioTest {
         val events = mutableListOf<String>()
         val slow = object : RecStore {
             val inner = MemStore()
+            override val boundIdentity: String get() = inner.boundIdentity
+            override fun liveIdentity(): String? = inner.liveIdentity()
             override suspend fun <T> transaction(block: suspend RecTx.() -> T): T { events += "import-start"; delay(150); return inner.transaction(block).also { events += "import-end" } }
         }
         val s = server(); val d = Device("A", workoutRecs(0), s); d.onboard()

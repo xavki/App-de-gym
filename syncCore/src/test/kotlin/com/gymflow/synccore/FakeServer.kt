@@ -20,6 +20,8 @@ class FakeServer(private val state: FakeServerState, private val uid: String, pr
     /** Si no es null, tras aplicar esta cantidad de cambios de un push se corta la red SIN devolver respuesta (subida parcial). */
     var cutAfterApplying: Int? = null
     var failPullAfterPages: Int? = null
+    /** Gancho de pruebas: se ejecuta al empezar la n-ésima descarga (1 = la primera), p. ej. para editar la base local «durante» la descarga. */
+    var beforePull: (suspend (Int) -> Unit)? = null
     var pushCalls = 0
     var pullCalls = 0
     private var pagesServed = 0
@@ -58,6 +60,7 @@ class FakeServer(private val state: FakeServerState, private val uid: String, pr
 
     override suspend fun pull(since: Long, limit: Int): PullResponse {
         pullCalls++
+        beforePull?.invoke(pullCalls)
         guard()
         if (failPullAfterPages != null && pagesServed >= failPullAfterPages!!) { failPullAfterPages = null; throw RemoteException(RemoteException.Kind.NETWORK, "corte de red") }
         val u = state.user(uid)

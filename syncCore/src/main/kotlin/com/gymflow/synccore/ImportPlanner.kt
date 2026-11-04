@@ -23,6 +23,8 @@ data class ImportChoices(
 )
 
 class ImportPlan internal constructor(
+    /** Cuenta+servidor para los que se preparó. Confirmar bajo otra identidad se rechaza. */
+    val ownerIdentity: String,
     val identity: Identity,
     val items: List<PlanItem>,
     val invalid: List<ItemIssue>,
@@ -49,7 +51,7 @@ class ImportIntegrityException(message: String) : Exception(message)
 
 object ImportPlanner {
     /** [local] = TODAS las filas locales del usuario (incluidos borrados lógicos), leídas en una transacción coherente. */
-    fun plan(parsed: ParsedExport, local: Collection<Rec>, activeUid: String): ImportPlan {
+    fun plan(parsed: ParsedExport, local: Collection<Rec>, activeUid: String, ownerIdentity: String = activeUid): ImportPlan {
         val idx = RecIndex(local)
         val identity = when {
             parsed.fileUserId == null -> Identity.UNKNOWN
@@ -96,7 +98,7 @@ object ImportPlanner {
         val sameName = parsed.aggregates.filter { it.kind == Kind.ROUTINE && it.rootId !in localNames }
             .count { a -> a.label.trim().lowercase() in localNames.values }
         if (sameName > 0) warnings += "$sameName rutina(s) del archivo tienen el mismo nombre que otras locales pero distinto id: se tratan como distintas (no se fusionan)."
-        return ImportPlan(identity, items, parsed.invalid, warnings, Content.fingerprint(local), parsed.sourceHash, aggs)
+        return ImportPlan(ownerIdentity, identity, items, parsed.invalid, warnings, Content.fingerprint(local), parsed.sourceHash, aggs)
     }
 
     /** Filas que se escribirían con [choices] (sin aplicar nada). */
@@ -135,7 +137,7 @@ interface RecTx {
     suspend fun insert(rec: Rec)
 }
 
-interface RecStore {
+interface RecStore : Identified {
     /** Todo o nada: si [block] lanza, NO queda ningún cambio. */
     suspend fun <T> transaction(block: suspend RecTx.() -> T): T
 }
@@ -144,9 +146,11 @@ data class ImportResult(val insertedRows: Int, val insertedAggregates: Int, val 
 
 object ImportExecutor {
     suspend fun apply(store: RecStore, plan: ImportPlan, choices: ImportChoices = ImportChoices()): ImportResult {
+        store.requireSame(plan.ownerIdentity)                        // H1: la cuenta/servidor de la confirmación deben ser los de la vista previa
         require(plan.canApply(choices)) { "El plan no se puede aplicar con estas opciones" }
         return SyncLock.mutex.withLock {
             store.transaction {
+                store.requireSame(plan.ownerIdentity)
                 val before = all()
                 if (Content.fingerprint(before) != plan.fingerprint) throw StaleImportPlanException()
                 val rows = ImportPlanner.rowsToInsert(plan, choices).map { it.copy(rev = 0, dirty = true) }
@@ -160,6 +164,7 @@ object ImportExecutor {
                 }
                 val untouched = before.associateBy { it.key }
                 for ((k, old) in untouched) if (!Content.same(after.byKey[k] ?: throw ImportIntegrityException("Se perdió ${k.table}/${k.id}"), old)) throw ImportIntegrityException("Cambió ${k.table}/${k.id}")
+                store.requireSame(plan.ownerIdentity)                        // H1: también justo antes de confirmar la transacción
                 val copies = plan.items.count { (it.status == ItemStatus.CONFLICT || it.status == ItemStatus.DELETED_LOCALLY) && it.rootKey in choices.importAsCopy }
                 ImportResult(
                     insertedRows = rows.size,

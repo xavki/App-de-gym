@@ -152,6 +152,14 @@ fun exportJson(recs: List<Rec>, uid: String = UID, schema: Int = 1, exportedAt: 
 
 /** Base local en memoria con transacciones de todo o nada (copia y restauración) y fallos inyectables. */
 class MemStore : RecStore {
+    /** Identidad con la que se abrió la operación y la «viva» (cambia si el usuario cambia de cuenta). */
+    override var boundIdentity: String = UID
+    var live: String? = UID
+    override fun liveIdentity(): String? = live
+    /** Filas que pertenecen a OTRA cuenta del mismo dispositivo (aislamiento entre usuarios, H2). */
+    val foreign = linkedMapOf<Key, String>()
+    private val lookup = OwnerLookup { t, i -> foreign[Key(t, i)]?.let { Owner.User(it) } ?: if (Key(t, i) in rows) Owner.User(UID) else Owner.Absent }
+    private fun guardWrite(rec: Rec) = OwnerGuard.checkWrite(UID, rec, lookup)
     val rows = linkedMapOf<Key, Rec>()
     val conflictGroups = linkedMapOf<Key, ConflictGroup>()
     val archived = mutableListOf<Triple<ConflictGroup, String, Long>>()
@@ -166,10 +174,10 @@ class MemStore : RecStore {
     private inner class Tx : RecTx, SyncTx {
         private fun tick() { if (failOnWrite > 0 && ++writes >= failOnWrite) { throw IllegalStateException("fallo inyectado") } }
         override suspend fun all(): List<Rec> = rows.values.toList()
-        override suspend fun insert(rec: Rec) { tick(); check(rec.key !in rows) { "ya existe ${rec.key}" }; rows[rec.key] = rec }
+        override suspend fun insert(rec: Rec) { tick(); guardWrite(rec); check(rec.key !in rows) { "ya existe ${rec.key}" }; rows[rec.key] = rec }
         override suspend fun records(): List<Rec> = rows.values.toList()
-        override suspend fun put(rec: Rec) { tick(); rows[rec.key] = rec }
-        override suspend fun remove(table: String, id: String) { tick(); rows.remove(Key(table, id)) }
+        override suspend fun put(rec: Rec) { tick(); guardWrite(rec); rows[rec.key] = rec }
+        override suspend fun remove(table: String, id: String) { tick(); OwnerGuard.checkDelete(UID, table, id, lookup); rows.remove(Key(table, id)) }
         override suspend fun conflicts(): List<ConflictGroup> = conflictGroups.values.toList()
         override suspend fun saveConflict(group: ConflictGroup) { tick(); conflictGroups[group.root] = group }
         override suspend fun removeConflict(root: Key) { conflictGroups.remove(root) }
@@ -192,4 +200,7 @@ class MemStore : RecStore {
 }
 
 /** Adaptador para usar un MemStore como SyncStore (las dos interfaces tienen un `transaction` con receptor distinto). */
-class SyncView(val m: MemStore) : SyncStore { override suspend fun <T> transaction(block: suspend SyncTx.() -> T): T = m.transactionSync(block) }
+class SyncView(val m: MemStore) : SyncStore {
+    override val boundIdentity: String get() = m.boundIdentity
+    override fun liveIdentity(): String? = m.liveIdentity()
+    override suspend fun <T> transaction(block: suspend SyncTx.() -> T): T = m.transactionSync(block) }
