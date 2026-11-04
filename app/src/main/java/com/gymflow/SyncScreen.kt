@@ -255,7 +255,7 @@ private fun statusText(state: SyncState, pending: Int, configured: Boolean, onbo
         SyncState.Idle -> "Pendiente de sincronizar$pendingText"
         SyncState.Running -> "Sincronizando…"
         SyncState.NeedsOnboarding -> "Pendiente de incorporar$pendingText"
-        is SyncState.Done -> "Sincronizado a las ${time(state.at)}$pendingText"
+        is SyncState.Done -> "Sincronizado a las ${time(state.at)}$pendingText" + (if (state.oversized > 0) " · ${state.oversized} elemento(s) demasiado grandes no se sincronizaron" else "")
         is SyncState.Failed -> "Error a las ${time(state.at)}: ${state.message}"
     }
 }

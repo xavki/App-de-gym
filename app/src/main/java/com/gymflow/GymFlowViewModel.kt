@@ -10,6 +10,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.gymflow.data.DataExporter
 import com.gymflow.data.FirestoreImporter
 import com.gymflow.data.GymRepository
+import com.gymflow.sync.DataEvents
 import com.gymflow.sync.SyncManager
 import com.gymflow.sync.SyncState
 import kotlinx.coroutines.*
@@ -130,6 +131,14 @@ class GymFlowViewModel(
                 }
             }
         }
+        // M-03: importar JSON, resolver un conflicto o incorporar este móvil cambian Room sin pasar por una descarga: se recargan las listas
+        viewModelScope.launch {
+            DataEvents.changed.collect {
+                loadAll()
+                rescheduleAlarms()
+                refreshPending()
+            }
+        }
         // Cuando llegan cambios del servidor (otro móvil), se recargan las listas
         viewModelScope.launch {
             SyncManager.state.collect { state ->
@@ -154,7 +163,7 @@ class GymFlowViewModel(
         viewModelScope.launch {
             val ok = FirestoreImporter.importUserDataWithConsent(appContext, repo, db, uid, FirestoreImporter.LegacyConsent.grant(uid)) { auth.currentUser?.uid == uid }
             loadAll()
-            legacyImportState = if (ok) "Datos antiguos importados." else "No se pudo completar. No se guardó nada a medias; puedes reintentar."
+            legacyImportState = if (ok) "Datos antiguos importados." else "No se pudo completar. Lo que ya se había añadido se conserva (sin duplicados) y puedes reintentar para terminar."
         }
     }
     fun dismissLegacyMessage() { legacyImportState = null }

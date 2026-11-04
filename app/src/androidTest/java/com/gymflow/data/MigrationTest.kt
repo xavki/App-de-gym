@@ -50,12 +50,40 @@ class MigrationTest {
             execSQL("INSERT INTO workouts VALUES ('w1', 'u', 'r1', 'Push', 5, 3600, 80.0, '', 5, 5, NULL, 0)")
             close()
         }
-        // Requiere app/schemas/.../3.json (lo genera Room al compilar la versión 3; PENDIENTE hasta la primera compilación)
+        // Requiere app/schemas/.../3.json = esquema de la v3 DISTRIBUIDA (commit 1a17b49). PENDIENTE: generarlo compilando ese commit y conservarlo.
         val db = helper.runMigrationsAndValidate(DB, 3, true, Migrations.MIGRATION_2_3)
         fun one(sql: String) = db.query(sql).use { it.moveToFirst(); it.getString(0) }
         assertEquals("Push", one("SELECT name FROM routines WHERE id = 'r1'"))          // los datos del usuario, intactos
         assertEquals("0", one("SELECT dirty FROM workouts WHERE id = 'w1'"))             // y su estado de sincronización, también
         for (t in listOf("sync_revs", "sync_state", "sync_conflicts", "sync_archive")) assertEquals("0", one("SELECT count(*) FROM $t"))
+    }
+
+    @Test fun migrate3To4KeepsDataAndAssignsRevisionsToTheirOwners() {
+        // Requiere 3.json (v3 distribuida, commit 1a17b49) y 4.json (se genera al compilar esta rama). PENDIENTE de ejecución en emulador desechable.
+        helper.createDatabase(DB, 3).apply {
+            execSQL("INSERT INTO routines VALUES ('r-a', 'uid-A', 'Push', 1, 1, NULL, 0)")
+            execSQL("INSERT INTO routines VALUES ('r-b', 'uid-B', 'Pull', 1, 1, NULL, 0)")
+            execSQL("INSERT INTO routine_exercises VALUES ('re-a', 'r-a', NULL, 'Bench', NULL, 0, '', NULL, 1, 1, NULL, 0)")
+            execSQL("INSERT INTO sync_revs VALUES ('srv', 'routines', 'r-a', 5)")
+            execSQL("INSERT INTO sync_revs VALUES ('srv', 'routine_exercises', 're-a', 6)")
+            execSQL("INSERT INTO sync_revs VALUES ('srv', 'routines', 'r-b', 7)")
+            execSQL("INSERT INTO sync_revs VALUES ('srv', 'routines', 'sin-fila', 9)")
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(DB, 4, true, Migrations.MIGRATION_3_4)
+        fun one(sql: String) = db.query(sql).use { it.moveToFirst(); it.getString(0) }
+        assertEquals("2", one("SELECT count(*) FROM routines"))                                   // datos intactos
+        assertEquals("1", one("SELECT count(*) FROM routine_exercises"))
+        assertEquals("5", one("SELECT rev FROM sync_revs WHERE userId='uid-A' AND tableName='routines' AND id='r-a'"))
+        assertEquals("6", one("SELECT rev FROM sync_revs WHERE userId='uid-A' AND tableName='routine_exercises'"))
+        assertEquals("7", one("SELECT rev FROM sync_revs WHERE userId='uid-B' AND id='r-b'"))
+        assertEquals("3", one("SELECT count(*) FROM sync_revs"))                                  // la huérfana se descarta
+    }
+
+    @Test fun migrateAllFrom1To4() {
+        helper.createDatabase(DB, 1).apply { execSQL("INSERT INTO routines VALUES ('r1', 'u', 'Push', 1, 1, NULL)"); close() }
+        val db = helper.runMigrationsAndValidate(DB, 4, true, *Migrations.ALL)
+        db.query("SELECT name FROM routines WHERE id='r1'").use { assertEquals("Push", it.apply { moveToFirst() }.getString(0)) }
     }
 
     private companion object { const val DB = "migration-test" }

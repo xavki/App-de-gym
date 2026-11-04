@@ -26,22 +26,32 @@ import com.gymflow.synccore.OnboardingResult
 import com.gymflow.synccore.RemoteException
 import com.gymflow.synccore.StaleImportPlanException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /** Estado de las pantallas Perfil → Importar datos y Perfil → Sincronización. Nunca se muestra éxito sin una verificación real. */
 class ImportSyncViewModel(app: Application) : AndroidViewModel(app) {
 
-    // H1: si cambia la cuenta (o se cierra sesión), toda vista previa pendiente deja de ser válida y se descarta sin aplicar nada.
+    // H1/N-03/N-08: si cambia la cuenta, toda operación pendiente se invalida: se cancelan las corrutinas, se sube la «generación»
+    // (los resultados tardíos de la cuenta anterior se ignoran) y se descartan las vistas previas. El listener se retira en onCleared.
+    private var generation = 0
+    private var ops = mutableListOf<Job>()
+    private var firstAuthEvent = true
     private val authListener = FirebaseAuth.AuthStateListener {
+        if (firstAuthEvent) { firstAuthEvent = false; return@AuthStateListener }
+        generation++; ops.forEach { it.cancel() }; ops.clear()
         importUi = ImportUi.Idle; importChoices = ImportChoices(); onboardUi = OnboardUi.Idle; copySavedOutside = false
-        status = SyncStatus(false, false, null, null, 0); conflicts = emptyList(); pendingLocalEditsFor = null
+        status = SyncStatus(false, false, null, null, 0); conflicts = emptyList(); pendingLocalEditsFor = null; conflictsIdentity = null
         message = "La cuenta cambió: se descartó la operación pendiente. No se modificó nada."
     }
-    private var firstAuthEvent = true
-    init {
-        FirebaseAuth.getInstance().addAuthStateListener { auth ->
-            if (firstAuthEvent) { firstAuthEvent = false } else authListener.onAuthStateChanged(auth)
-        }
+    init { FirebaseAuth.getInstance().addAuthStateListener(authListener) }
+    override fun onCleared() { FirebaseAuth.getInstance().removeAuthStateListener(authListener); ops.forEach { it.cancel() }; super.onCleared() }
+
+    /** Lanza una operación ligada a la generación actual: si la cuenta cambia mientras corre, su resultado no se publica. */
+    private fun launchOp(body: suspend (isCurrent: () -> Boolean) -> Unit) {
+        val gen = generation
+        ops.removeAll { !it.isActive }
+        ops += viewModelScope.launch { body { gen == generation } }
     }
 
     // ───────────── importación ─────────────
@@ -61,8 +71,9 @@ class ImportSyncViewModel(app: Application) : AndroidViewModel(app) {
     fun pickImportFile(uri: Uri) {
         importUi = ImportUi.Working("Analizando el archivo…")
         importChoices = ImportChoices()
-        viewModelScope.launch {
-            importUi = try { ImportUi.Preview(SyncService.planImport(getApplication(), uri)) } catch (e: Exception) { ImportUi.Error(friendly(e)) }
+        launchOp { current ->
+            val r = try { ImportUi.Preview(SyncService.planImport(getApplication(), uri)) } catch (e: CancellationException) { throw e } catch (e: Exception) { ImportUi.Error(friendly(e)) }
+            if (current()) importUi = r
         }
     }
 
@@ -77,8 +88,9 @@ class ImportSyncViewModel(app: Application) : AndroidViewModel(app) {
         val ui = importUi as? ImportUi.Preview ?: return
         if (!ui.plan.canApply(importChoices)) return
         importUi = ImportUi.Working("Importando…")
-        viewModelScope.launch {
-            importUi = try { ImportUi.Done(SyncService.applyImport(getApplication(), ui.plan, importChoices)) } catch (e: Exception) { ImportUi.Error(friendly(e)) }
+        launchOp { current ->
+            val r = try { ImportUi.Done(SyncService.applyImport(getApplication(), ui.plan, importChoices)) } catch (e: CancellationException) { throw e } catch (e: Exception) { ImportUi.Error(friendly(e)) }
+            if (current()) importUi = r
         }
     }
 
@@ -104,10 +116,13 @@ class ImportSyncViewModel(app: Application) : AndroidViewModel(app) {
     var message by mutableStateOf<String?>(null)
 
     fun refresh() {
-        viewModelScope.launch {
+        launchOp { current ->
             try {
-                status = SyncService.status(getApplication())
-                conflicts = if (status.configured && status.onboarded) SyncService.conflicts(getApplication()) else emptyList()
+                val identity = SyncService.conflictsIdentity(getApplication())
+                val st = SyncService.status(getApplication())
+                val list = if (st.configured && st.onboarded) SyncService.conflicts(getApplication()) else emptyList()
+                if (!current()) return@launchOp
+                status = st; conflicts = list; conflictsIdentity = identity
             } catch (e: CancellationException) { throw e } catch (e: Exception) { /* sin sesión o sin servidor: estado vacío */ }
         }
     }
@@ -115,8 +130,9 @@ class ImportSyncViewModel(app: Application) : AndroidViewModel(app) {
     fun startOnboarding() {
         copySavedOutside = false
         onboardUi = OnboardUi.Working("Comparando este móvil con el servidor… (solo lectura)")
-        viewModelScope.launch {
-            onboardUi = try { OnboardUi.Review(SyncService.prepareOnboarding(getApplication())) } catch (e: Exception) { OnboardUi.Error(friendly(e)) }
+        launchOp { current ->
+            val r = try { OnboardUi.Review(SyncService.prepareOnboarding(getApplication())) } catch (e: CancellationException) { throw e } catch (e: Exception) { OnboardUi.Error(friendly(e)) }
+            if (current()) onboardUi = r
         }
     }
 
@@ -129,8 +145,9 @@ class ImportSyncViewModel(app: Application) : AndroidViewModel(app) {
     fun confirmOnboarding() {
         val ui = onboardUi as? OnboardUi.Review ?: return
         onboardUi = OnboardUi.Working("Creando y verificando la copia recuperable…")
-        viewModelScope.launch {
-            onboardUi = try { OnboardUi.Done(SyncService.onboard(getApplication(), ui.plan, copySavedOutside)).also { refresh() } } catch (e: Exception) { OnboardUi.Error(friendly(e)) }
+        launchOp { current ->
+            val r = try { OnboardUi.Done(SyncService.onboard(getApplication(), ui.plan, copySavedOutside)) } catch (e: CancellationException) { throw e } catch (e: Exception) { OnboardUi.Error(friendly(e)) }
+            if (current()) { onboardUi = r; refresh() }
         }
     }
 
@@ -138,10 +155,13 @@ class ImportSyncViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Conflicto cuya resolución «usar servidor» espera una segunda confirmación porque se editó localmente después (H3). */
     var pendingLocalEditsFor by mutableStateOf<Key?>(null)
+    /** Identidad (cuenta+servidor) con la que se cargó la lista de conflictos mostrada; la resolución debe coincidir (C4). */
+    private var conflictsIdentity: String? = null
 
     fun resolve(root: Key, keepLocal: Boolean, acknowledgeLocalEdits: Boolean = false) {
-        viewModelScope.launch {
-            try { SyncService.resolve(getApplication(), root, keepLocal, acknowledgeLocalEdits); pendingLocalEditsFor = null; message = if (keepLocal) "Se conserva la versión de este móvil." else "Se usa la versión del servidor (la tuya queda archivada)." }
+        val identity = conflictsIdentity
+        launchOp { current ->
+            try { SyncService.resolve(getApplication(), root, keepLocal, acknowledgeLocalEdits, identity); pendingLocalEditsFor = null; message = if (keepLocal) "Se conserva la versión de este móvil." else "Se usa la versión del servidor (la tuya queda archivada)." }
             catch (e: ConflictResolver.LocalChangedSinceConflictException) { pendingLocalEditsFor = root; message = e.message }
             catch (e: ConflictResolver.NotResolvableException) { message = e.message }
             catch (e: CancellationException) { throw e }

@@ -11,7 +11,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.google.android.gms.tasks.Task
+import com.gymflow.data.await
 import com.google.firebase.auth.FirebaseAuth
 import com.gymflow.BuildConfig
 import com.gymflow.data.GymDatabase
@@ -24,9 +24,6 @@ import com.gymflow.synccore.SyncRunner
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 /** Estado visible en la pantalla de perfil. */
 sealed interface SyncState {
@@ -34,7 +31,7 @@ sealed interface SyncState {
     data object Running : SyncState
     /** Este dispositivo aún no se ha incorporado al servidor: no se hace NINGUNA llamada de red hasta confirmarlo. */
     data object NeedsOnboarding : SyncState
-    data class Done(val at: Long, val pushed: Int, val pulled: Int, val openConflicts: Int) : SyncState
+    data class Done(val at: Long, val pushed: Int, val pulled: Int, val openConflicts: Int, val oversized: Int = 0) : SyncState
     data class Failed(val at: Long, val message: String, val retryable: Boolean) : SyncState
 }
 
@@ -78,6 +75,10 @@ object SyncManager {
 
     fun currentUid(): String? = FirebaseAuth.getInstance().currentUser?.uid
 
+    /** Identidad de una operación LOCAL (importar JSON): solo la cuenta; no exige servidor configurado. */
+    fun liveLocalIdentity(): String? = currentUid()?.let { OperationIdentity.of(it, LOCAL_SERVER_KEY) }
+    const val LOCAL_SERVER_KEY = "local"
+
     /** Identidad VIVA ahora mismo: cuenta de Firebase + servidor configurado (null si falta alguna). */
     fun liveIdentity(context: Context): String? {
         val uid = currentUid() ?: return null
@@ -117,7 +118,7 @@ object SyncManager {
         val outcome = SyncRunner(store, api).run()
         _state.value = when (outcome) {
             SyncOutcome.OnboardingRequired -> SyncState.NeedsOnboarding
-            is SyncOutcome.Success -> SyncState.Done(System.currentTimeMillis(), outcome.pushed, outcome.pulled, outcome.openConflicts)
+            is SyncOutcome.Success -> SyncState.Done(System.currentTimeMillis(), outcome.pushed, outcome.pulled, outcome.openConflicts, outcome.oversized)
             is SyncOutcome.Failed -> SyncState.Failed(System.currentTimeMillis(), describe(outcome.kind), outcome.retryable)
         }
         return outcome
@@ -163,9 +164,4 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         is SyncOutcome.Success -> Result.success()
         is SyncOutcome.Failed -> if (outcome.retryable) Result.retry() else Result.failure()
     }
-}
-
-private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
-    addOnSuccessListener { cont.resume(it) }
-    addOnFailureListener { cont.resumeWithException(it) }
 }

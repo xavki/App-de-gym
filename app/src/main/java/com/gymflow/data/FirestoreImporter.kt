@@ -2,7 +2,6 @@ package com.gymflow.data
 
 import android.content.Context
 import android.util.Log
-import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import com.gymflow.BodyMeasurement
@@ -11,9 +10,6 @@ import com.gymflow.ExerciseDefinition
 import com.gymflow.RecurrenceType
 import com.gymflow.ScheduledRoutine
 import com.gymflow.WorkoutSession
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 /**
  * Migración única desde Firestore a Room. Firestore ya no recibe escrituras de
