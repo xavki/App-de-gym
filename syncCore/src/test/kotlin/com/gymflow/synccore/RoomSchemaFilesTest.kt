@@ -38,11 +38,13 @@ class RoomSchemaFilesTest {
     }
 
     @Test fun `el hash auténtico se obtiene tambien si el checkout fuese CRLF`() {
-        val lf = File(dir, "3.json").readBytes()
-        val crlf = String(lf, Charsets.ISO_8859_1).replace("\n", "\r\n").toByteArray(Charsets.ISO_8859_1)
-        fun h(b: ByteArray) = MessageDigest.getInstance("SHA-256").digest(String(b, Charsets.ISO_8859_1).replace("\r\n", "\n").toByteArray(Charsets.ISO_8859_1)).joinToString("") { "%02x".format(it) }
-        assertEquals(h(lf), h(crlf))
-        assertTrue(!MessageDigest.getInstance("SHA-256").digest(crlf).contentEquals(MessageDigest.getInstance("SHA-256").digest(lf)))   // el bruto sí difiere
+        fun norm(b: ByteArray) = String(b, Charsets.ISO_8859_1).replace("\r\n", "\n")
+        fun sha(t: String) = MessageDigest.getInstance("SHA-256").digest(t.toByteArray(Charsets.ISO_8859_1)).joinToString("") { "%02x".format(it) }
+        val lf = norm(File(dir, "3.json").readBytes())                       // independiente de cómo esté el checkout
+        val crlf = lf.replace("\n", "\r\n")
+        assertEquals("6c67f70849278a6de558fe0a674eb50bdb8416b6a8ad97afd27d10bb979b6296", sha(lf))
+        assertEquals(sha(lf), sha(norm(crlf.toByteArray(Charsets.ISO_8859_1))))       // normalizado: misma suma auténtica
+        assertTrue(sha(crlf) != sha(lf))                                           // el bruto CRLF sí difiere (es lo que fallaba en Windows)
     }
 
     @Test fun `integridad e identidad de los esquemas 3 y 4`() {
