@@ -76,5 +76,19 @@ object Migrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2)
+    /**
+     * v2 → v3: estado de la sincronización v2. SOLO crea tablas nuevas: no toca ninguna fila existente ni ninguna tabla de datos
+     * (los datos del usuario quedan exactamente igual). Lo ya sincronizado con el protocolo anterior vuelve a pasar por la
+     * incorporación inicial, que compara contenidos y no pisa nada.
+     */
+    val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS `sync_revs` (`serverKey` TEXT NOT NULL, `tableName` TEXT NOT NULL, `id` TEXT NOT NULL, `rev` INTEGER NOT NULL, PRIMARY KEY(`serverKey`, `tableName`, `id`))")
+            db.execSQL("CREATE TABLE IF NOT EXISTS `sync_state` (`userId` TEXT NOT NULL, `serverKey` TEXT NOT NULL, `cursor` INTEGER NOT NULL, `onboarded` INTEGER NOT NULL, `lastSuccessAt` INTEGER, `lastErrorKind` TEXT, PRIMARY KEY(`userId`, `serverKey`))")
+            db.execSQL("CREATE TABLE IF NOT EXISTS `sync_conflicts` (`userId` TEXT NOT NULL, `serverKey` TEXT NOT NULL, `rootTable` TEXT NOT NULL, `rootId` TEXT NOT NULL, `groupJson` TEXT NOT NULL, PRIMARY KEY(`userId`, `serverKey`, `rootTable`, `rootId`))")
+            db.execSQL("CREATE TABLE IF NOT EXISTS `sync_archive` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `serverKey` TEXT NOT NULL, `rootTable` TEXT NOT NULL, `rootId` TEXT NOT NULL, `resolution` TEXT NOT NULL, `at` INTEGER NOT NULL, `groupJson` TEXT NOT NULL, PRIMARY KEY(`id`))")
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 }

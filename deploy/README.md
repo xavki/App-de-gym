@@ -53,6 +53,17 @@ Navegador (panel) ──────▶   │        (sirve también el panel we
    (pruebas sin Docker: `bash deploy/test/backup_test.sh`).
    Restaurar: `gunzip -c backups/gymflow-FECHA-HORA.sql.gz | docker compose exec -T db psql -U gymflow gymflow`.
 
+## Protocolo de sincronización v2 (importante al actualizar)
+
+La versión con importación y sincronización multidispositivo añade la migración `V4__sync_revisions.sql` (columna `rev` en `records`,
+las filas existentes pasan a la revisión 1) y cambia las reglas de escritura: **ya no gana la fecha del móvil**; cada cambio declara la
+revisión del servidor sobre la que se basa (`baseRev`) y, si no coincide y el contenido difiere, el servidor devuelve un *conflicto* sin
+sobrescribir nada. Reenviar un mismo cambio es idempotente.
+
+Antes de actualizar el servidor: haz una copia (`deploy/backup.sh`) y comprueba que puedes restaurarla. Después de actualizar, cada móvil
+debe pasar por *Perfil → Sincronización → Revisar incorporación* (vista previa de solo lectura, copia recuperable y confirmación). Una app
+anterior sin `baseRev` solo podrá crear filas nuevas; sus ediciones de filas existentes se tratan como conflicto, nunca como sobrescritura.
+
 ## Actualizar
 
 ```bash

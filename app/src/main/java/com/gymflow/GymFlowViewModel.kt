@@ -136,9 +136,9 @@ class GymFlowViewModel(
         viewModelScope.launch {
             SyncManager.state.collect { state ->
                 syncState = state
-                if (state is SyncState.Done && state.result.pulled > 0) {
+                if (state is SyncState.Done && state.pulled > 0) {
                     loadAll()
-                    if ("schedules" in state.result.pulledTables) rescheduleAlarms()
+                    rescheduleAlarms()
                 }
                 if (state !is SyncState.Running) refreshPending()
             }
@@ -169,17 +169,21 @@ class GymFlowViewModel(
         viewModelScope.launch { pendingChanges = repo.pendingChanges(uid) }
     }
 
-    fun updateServerUrl(url: String) {
-        SyncManager.setServerUrl(appContext, url)
+    /** Devuelve un mensaje de error si la dirección no es válida (en cuyo caso no se guarda nada). */
+    fun updateServerUrl(url: String): String? {
+        val error = SyncManager.setServerUrl(appContext, url)
         serverUrl = SyncManager.serverUrl(appContext)
+        return error
     }
 
     fun syncNow() {
         viewModelScope.launch {
             try {
                 if (SyncManager.syncNow(appContext) == null) errorMessage = "Configura antes la dirección del servidor"
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                errorMessage = "No se pudo sincronizar: ${e.message}"
+                errorMessage = "No se pudo sincronizar. No se ha perdido ningún dato."
             }
         }
     }

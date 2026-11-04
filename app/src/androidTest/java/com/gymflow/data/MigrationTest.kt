@@ -44,5 +44,19 @@ class MigrationTest {
         assertEquals("0", one("SELECT count(*) FROM pragma_foreign_key_list('workout_sets')"))
     }
 
+    @Test fun migrate2To3OnlyAddsSyncTablesAndKeepsEveryRow() {
+        helper.createDatabase(DB, 2).apply {
+            execSQL("INSERT INTO routines VALUES ('r1', 'u', 'Push', 1, 1, NULL, 1)")
+            execSQL("INSERT INTO workouts VALUES ('w1', 'u', 'r1', 'Push', 5, 3600, 80.0, '', 5, 5, NULL, 0)")
+            close()
+        }
+        // Requiere app/schemas/.../3.json (lo genera Room al compilar la versión 3; PENDIENTE hasta la primera compilación)
+        val db = helper.runMigrationsAndValidate(DB, 3, true, Migrations.MIGRATION_2_3)
+        fun one(sql: String) = db.query(sql).use { it.moveToFirst(); it.getString(0) }
+        assertEquals("Push", one("SELECT name FROM routines WHERE id = 'r1'"))          // los datos del usuario, intactos
+        assertEquals("0", one("SELECT dirty FROM workouts WHERE id = 'w1'"))             // y su estado de sincronización, también
+        for (t in listOf("sync_revs", "sync_state", "sync_conflicts", "sync_archive")) assertEquals("0", one("SELECT count(*) FROM $t"))
+    }
+
     private companion object { const val DB = "migration-test" }
 }

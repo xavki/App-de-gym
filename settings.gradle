@@ -14,3 +14,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Gym"
 include ':app'
+// Núcleo Kotlin/JVM de importación y sincronización (se prueba por separado: cd syncCore && gradle test)
+include ':syncCore'

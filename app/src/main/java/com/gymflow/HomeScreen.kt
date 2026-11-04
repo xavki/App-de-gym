@@ -628,6 +628,10 @@ fun ProfileScreen(
             Spacer(Modifier.height(24.dp))
             ExportDataSection(viewModel)
         }
+        item {
+            Spacer(Modifier.height(24.dp))
+            ImportDataSection()
+        }
 
         // ── Botón cerrar sesión ─────────────────────────────────────────────
         item {

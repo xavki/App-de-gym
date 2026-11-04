@@ -54,6 +54,9 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
+      - name: Tests del núcleo de importación y sincronización (JVM puro)
+        run: gradle :syncCore:test --stacktrace
+
       - name: Tests unitarios (JVM)
         run: gradle :app:testDebugUnitTest --stacktrace
 

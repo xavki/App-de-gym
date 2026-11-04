@@ -10,14 +10,16 @@ import androidx.room.RoomDatabase
         ExerciseEntity::class,
         RoutineEntity::class, RoutineExerciseEntity::class, RoutineSetEntity::class,
         WorkoutEntity::class, WorkoutExerciseEntity::class, WorkoutSetEntity::class,
-        BodyMeasurementEntity::class, ScheduleEntity::class, AchievementEntity::class
+        BodyMeasurementEntity::class, ScheduleEntity::class, AchievementEntity::class,
+        SyncRevEntity::class, SyncStateEntity::class, SyncConflictEntity::class, SyncArchiveEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class GymDatabase : RoomDatabase() {
     abstract fun dao(): GymDao
     abstract fun syncDao(): SyncDao
+    abstract fun syncStateDao(): SyncStateDao
 
     companion object {
         @Volatile private var instance: GymDatabase? = null
