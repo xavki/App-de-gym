@@ -1,0 +1,263 @@
+{
+  "description": "Casos compartidos por syncCore (Content.same) y el servidor (ContentEquality.same): deben dar el mismo resultado.",
+  "cases": [
+    {
+      "name": "idéntico",
+      "a": {
+        "id": "1",
+        "name": "a",
+        "reps": 10
+      },
+      "b": {
+        "id": "1",
+        "name": "a",
+        "reps": 10
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "updatedAt distinto se ignora",
+      "a": {
+        "name": "a",
+        "updatedAt": 1
+      },
+      "b": {
+        "name": "a",
+        "updatedAt": 999
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "createdAt distinto se ignora",
+      "a": {
+        "name": "a",
+        "createdAt": 1
+      },
+      "b": {
+        "name": "a",
+        "createdAt": 2
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "userId distinto se ignora",
+      "a": {
+        "name": "a",
+        "userId": "u1"
+      },
+      "b": {
+        "name": "a",
+        "userId": "u2"
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "deletedAt dentro de data se ignora",
+      "a": {
+        "name": "a",
+        "deletedAt": 5
+      },
+      "b": {
+        "name": "a",
+        "deletedAt": null
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "null equivale a ausente",
+      "a": {
+        "name": "a",
+        "notes": null
+      },
+      "b": {
+        "name": "a"
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "orden de claves irrelevante",
+      "a": {
+        "a": 1,
+        "b": 2
+      },
+      "b": {
+        "b": 2,
+        "a": 1
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "62.50 = 62.5",
+      "a": {
+        "w": 62.5
+      },
+      "b": {
+        "w": 62.5
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "10 = 10.0",
+      "a": {
+        "w": 10
+      },
+      "b": {
+        "w": 10.0
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "0 = 0.0",
+      "a": {
+        "w": 0
+      },
+      "b": {
+        "w": 0.0
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "contenido distinto",
+      "a": {
+        "name": "a"
+      },
+      "b": {
+        "name": "b"
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": false
+    },
+    {
+      "name": "número distinto",
+      "a": {
+        "reps": 10
+      },
+      "b": {
+        "reps": 11
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": false
+    },
+    {
+      "name": "texto vs número no son iguales",
+      "a": {
+        "v": "10"
+      },
+      "b": {
+        "v": 10
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": false
+    },
+    {
+      "name": "vivo vs borrado",
+      "a": {
+        "name": "a"
+      },
+      "b": {
+        "name": "a"
+      },
+      "aDeleted": false,
+      "bDeleted": true,
+      "same": false
+    },
+    {
+      "name": "borrado vs borrado",
+      "a": {
+        "name": "a"
+      },
+      "b": {
+        "name": "a"
+      },
+      "aDeleted": true,
+      "bDeleted": true,
+      "same": true
+    },
+    {
+      "name": "campo extra no nulo",
+      "a": {
+        "name": "a"
+      },
+      "b": {
+        "name": "a",
+        "extra": "x"
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": false
+    },
+    {
+      "name": "anidado igual",
+      "a": {
+        "x": {
+          "a": [
+            1,
+            2,
+            {
+              "b": 3.0
+            }
+          ]
+        }
+      },
+      "b": {
+        "x": {
+          "a": [
+            1,
+            2,
+            {
+              "b": 3
+            }
+          ]
+        }
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": true
+    },
+    {
+      "name": "anidado distinto",
+      "a": {
+        "x": {
+          "a": [
+            1,
+            2
+          ]
+        }
+      },
+      "b": {
+        "x": {
+          "a": [
+            2,
+            1
+          ]
+        }
+      },
+      "aDeleted": false,
+      "bDeleted": false,
+      "same": false
+    }
+  ]
+}

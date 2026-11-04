@@ -5,8 +5,13 @@ import kotlinx.serialization.json.JsonObject
 
 // ─── Protocolo de sincronización ─────────────────────────────────────────────
 // Cada registro de la app viaja como un "Change": la tabla, su id (UUID), cuándo
-// se modificó (epoch ms, lo decide el móvil) y el contenido completo en `data`.
-// Gana la versión con updatedAt más reciente (last-write-wins por registro).
+// se modificó (epoch ms, informativo), el contenido completo en `data` y la REVISIÓN del servidor
+// sobre la que se hizo el cambio (`baseRev`). Control de versiones optimista (protocolo v2):
+//  · fila nueva                                   → se acepta (rev 1)
+//  · mismo contenido que el guardado              → "unchanged" (idempotente: reenviar no cambia nada)
+//  · baseRev == rev actual                        → se acepta (rev + 1)
+//  · cualquier otro caso                          → "conflict": NO se sobrescribe, se devuelve la versión del servidor
+// La fecha del móvil NO decide quién gana. Los cambios con el mismo `group` se aplican todos o ninguno.
 
 /** Tablas de la app que se sincronizan (mismos nombres que en Room). */
 val SYNC_TABLES = setOf(
@@ -22,13 +27,28 @@ data class Change(
     val updatedAt: Long,
     val deletedAt: Long? = null,
     val data: JsonObject,
+    /** Revisión del servidor sobre la que se basa el cambio (0 = el cliente cree que es una fila nueva). */
+    val baseRev: Long = 0,
+    /** Cambios con el mismo grupo (raíz del agregado) se aplican atómicamente. */
+    val group: String? = null,
 )
 
 @Serializable
 data class PushRequest(val changes: List<Change>)
 
 @Serializable
-data class PushResponse(val accepted: Int, val ignored: Int)
+data class PushResult(
+    val table: String,
+    val id: String,
+    /** accepted | unchanged | conflict | blocked */
+    val status: String,
+    val rev: Long = 0,
+    val server: PulledChange? = null,
+)
+
+/** accepted = aceptados + sin cambios; ignored = conflictos + bloqueados; results = uno por cambio, en el mismo orden. */
+@Serializable
+data class PushResponse(val accepted: Int, val ignored: Int, val results: List<PushResult> = emptyList())
 
 @Serializable
 data class PulledChange(
@@ -38,6 +58,7 @@ data class PulledChange(
     val deletedAt: Long? = null,
     val data: JsonObject,
     val version: Long,
+    val rev: Long = 1,
 )
 
 /**

@@ -171,7 +171,7 @@ class NutritionHistoryTest {
         val pushed = client.post("/api/sync/push") {
             bearerAuth(token); contentType(ContentType.Application.Json); setBody(PushRequest(listOf(workout)))
         }.body<PushResponse>()
-        assertEquals(PushResponse(1, 0), pushed)
+        assertEquals(1, pushed.accepted); assertEquals(0, pushed.ignored)
         val before = client.get("/api/sync/pull?since=0") { bearerAuth(token) }.body<PullResponse>()
 
         client.logMeal(token, "C1", "2026-10-20")
@@ -222,7 +222,7 @@ class NutritionHistoryTest {
                ('u1', 'workouts', 'w1', 1000, 1, '{"name":"Push"}'), ('u1', 'workout_sets', 's1', 1000, 2, '{"reps":8}')""",
             "INSERT INTO panel_tokens (token_hash, user_id) VALUES ('h1', 'u1')",
         )
-        val before = query(db, "SELECT md5(string_agg(t::text, ',' ORDER BY t::text)) FROM (SELECT * FROM records) t") { it.getString(1) }
+        val before = query(db, "SELECT md5(string_agg(t::text, ',' ORDER BY t::text)) FROM (SELECT user_id, table_name, id, updated_at, deleted_at, version, data FROM records) t") { it.getString(1) }
 
         Database(db).use { database -> // así arranca el servidor nuevo: migra hasta V3
             val repo = NutritionRepository(database)
@@ -231,10 +231,12 @@ class NutritionHistoryTest {
             val r = repo.create("u1", null, java.util.UUID.randomUUID(), LogSource.Catalog("D1"), LocalDate.parse("2026-10-20"), 1.0)
             assertTrue(r is CreateLogResult.Created)
         }
-        assertEquals(before, query(db, "SELECT md5(string_agg(t::text, ',' ORDER BY t::text)) FROM (SELECT * FROM records) t") { it.getString(1) })
+        assertEquals(before, query(db, "SELECT md5(string_agg(t::text, ',' ORDER BY t::text)) FROM (SELECT user_id, table_name, id, updated_at, deleted_at, version, data FROM records) t") { it.getString(1) })
         assertEquals(2L, query(db, "SELECT sync_version FROM users WHERE id = 'u1'") { it.getLong(1) })
         assertEquals(1, query(db, "SELECT count(*) FROM panel_tokens") { it.getInt(1) })
-        assertEquals("3", query(db, "SELECT max(version::int)::text FROM flyway_schema_history WHERE success") { it.getString(1) })
+        assertEquals("4", query(db, "SELECT max(version::int)::text FROM flyway_schema_history WHERE success") { it.getString(1) })
+        assertEquals(1L, query(db, "SELECT min(rev) FROM records") { it.getLong(1) })      // V4: las filas existentes empiezan en la revisión 1
+        assertEquals(1L, query(db, "SELECT max(rev) FROM records") { it.getLong(1) })
     }
 
     @Test fun migratesV2NutritionDataToV3() {
@@ -276,6 +278,6 @@ class NutritionHistoryTest {
         val result = Flyway.configure().dataSource(db.url, db.user, db.password)
             .locations("filesystem:${onlyV1.absolutePath}").load().migrate()
         assertEquals(0, result.migrationsExecuted)
-        assertEquals("3", query(db, "SELECT max(version::int)::text FROM flyway_schema_history WHERE success") { it.getString(1) })
+        assertEquals("4", query(db, "SELECT max(version::int)::text FROM flyway_schema_history WHERE success") { it.getString(1) })
     }
 }

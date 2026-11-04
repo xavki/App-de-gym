@@ -76,7 +76,7 @@ class ServerTest {
         val b = change("workouts")
         val c = change("workout_sets", deletedAt = 500)
         val res = client.push(token, a, b, c).body<PushResponse>()
-        assertEquals(PushResponse(3, 0), res)
+        assertEquals(3, res.accepted); assertEquals(0, res.ignored); assertTrue(res.results.all { it.status == "accepted" && it.rev == 1L })
 
         val pulled = client.pull(token)
         assertEquals(setOf(a.id, b.id, c.id), pulled.changes.map { it.id }.toSet())
@@ -86,24 +86,6 @@ class ServerTest {
         assertEquals(false, pulled.hasMore)
 
         assertTrue(client.pull(token, since = pulled.cursor).changes.isEmpty())
-    }
-
-    @Test fun lastWriteWins() = testApplication {
-        val client = setUp()
-        val token = keys.token(newUid())
-        val id = uuid()
-        fun named(name: String, at: Long) = change("routines", id, at, data = buildJsonObject { put("name", name) })
-
-        client.push(token, named("v2", 2000))
-        assertEquals(PushResponse(0, 1), client.push(token, named("viejo", 1000)).body())   // más antiguo: ignorado
-        assertEquals(PushResponse(0, 1), client.push(token, named("igual", 2000)).body())   // misma fecha: ignorado
-        val first = client.pull(token)
-        assertEquals("v2", first.changes.single().data["name"]!!.jsonPrimitive.content)
-
-        assertEquals(PushResponse(1, 0), client.push(token, named("v3", 3000)).body())
-        val next = client.pull(token, since = first.cursor)
-        assertEquals("v3", next.changes.single().data["name"]!!.jsonPrimitive.content)
-        assertTrue(next.changes.single().version > first.cursor)
     }
 
     @Test fun usersAreIsolated() = testApplication {
@@ -192,7 +174,7 @@ class ServerTest {
             change("workouts", w, data = buildJsonObject { put("id", w); put("name", "Borrado"); put("startedAt", 1000) }),
             change("workout_exercises", ex, data = buildJsonObject { put("id", ex); put("workoutId", w); put("exerciseName", "X"); put("position", 0) }),
         )
-        client.push(token, change("workouts", w, updatedAt = 2000, deletedAt = 2000, data = buildJsonObject { put("id", w) }))
+        client.push(token, change("workouts", w, updatedAt = 2000, deletedAt = 2000, data = buildJsonObject { put("id", w) }, baseRev = 1))
         val export = Json.parseToJsonElement(client.get("/api/export") { bearerAuth(token) }.bodyAsText()).jsonObject
         assertEquals(0, export["workouts"]!!.jsonArray.size)
     }

@@ -53,6 +53,7 @@ data class UserPrincipal(val uid: String, val email: String?, val panel: Boolean
 
 private const val MAX_CHANGES_PER_PUSH = 2000
 private const val MAX_RECORD_BYTES = 64 * 1024
+private const val MAX_GROUP_CHARS = 100
 private const val MAX_PUSH_BYTES = 10L * 1024 * 1024
 private const val MAX_CLOCK_SKEW_MS = 24L * 60 * 60 * 1000
 private val UUID_RE = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
@@ -200,7 +201,12 @@ private fun validate(request: PushRequest, now: Long) {
     if (request.changes.size > MAX_CHANGES_PER_PUSH) {
         throw BadRequestException("Máximo $MAX_CHANGES_PER_PUSH cambios por petición")
     }
+    if (request.changes.map { it.table to it.id }.toSet().size != request.changes.size) {
+        throw BadRequestException("Hay cambios repetidos (misma tabla e id) en la misma petición")
+    }
     request.changes.forEach { ch ->
+        if (ch.baseRev < 0) throw BadRequestException("baseRev no válido en ${ch.table}/${ch.id}")
+        if (ch.group != null && (ch.group.isBlank() || ch.group.length > MAX_GROUP_CHARS)) throw BadRequestException("Grupo no válido en ${ch.table}/${ch.id}")
         if (ch.table !in SYNC_TABLES) throw BadRequestException("Tabla desconocida: ${ch.table}")
         if (!UUID_RE.matches(ch.id)) throw BadRequestException("Id no válido: ${ch.id}")
         if (ch.updatedAt < 1 || ch.updatedAt > now + MAX_CLOCK_SKEW_MS) {

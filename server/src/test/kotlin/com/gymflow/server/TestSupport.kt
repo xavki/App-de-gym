@@ -91,5 +91,7 @@ fun ApplicationTestBuilder.setUp(clock: Clock = Clock.systemUTC(), config: AppCo
 fun newUid() = "user-" + UUID.randomUUID()
 fun uuid() = UUID.randomUUID().toString()
 
-fun change(table: String, id: String = uuid(), updatedAt: Long = 1000, deletedAt: Long? = null, data: JsonObject = buildJsonObject { put("id", id) }) =
-    Change(table, id, updatedAt, deletedAt, data)
+fun change(
+    table: String, id: String = uuid(), updatedAt: Long = 1000, deletedAt: Long? = null,
+    data: JsonObject = buildJsonObject { put("id", id) }, baseRev: Long = 0, group: String? = null,
+) = Change(table, id, updatedAt, deletedAt, data, baseRev, group)
