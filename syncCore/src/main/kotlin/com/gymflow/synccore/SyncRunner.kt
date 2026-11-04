@@ -204,6 +204,7 @@ class SyncRunner(
             val changes = downloadFrom(id, start)
             val (n, newOpen) = tx(id) {
                 val res = applyAll(changes.records)
+                assertGraphComplete(changes.records)        // N-06: ningún hijo sin padre se confirma (ni el cursor)
                 setMeta(meta().copy(cursor = changes.cursor))
                 if (start == 0L) conflicts().filter { !it.complete }.forEach { saveConflict(it.copy(complete = true)) }   // descarga completa terminada
                 res
@@ -216,6 +217,23 @@ class SyncRunner(
             break
         }
         return applied
+    }
+
+    /** Todo hijo recibido debe tener su padre (recibido ahora o ya local) y la cadena hasta la raíz completa; si no, se revierte la descarga. */
+    private suspend fun SyncTx.assertGraphComplete(received: List<RemoteRecord>) {
+        if (received.isEmpty()) return
+        val idx = RecIndex(records())
+        val frozen = conflicts().flatMap { g -> g.items.map { Key(it.table, it.id) } }.toSet()      // lo congelado en un conflicto no se aplica
+        for (c in received) {
+            if (Key(c.table, c.id) in frozen) continue
+            var key = Key(c.table, c.id); var guard = 0
+            while (guard++ < 6) {
+                val rec = idx.byKey[key] ?: throw RemoteException(RemoteException.Kind.SERVER, "Datos incompletos del servidor (falta ${key.table})")
+                val (pt, f) = Tables.PARENT[key.table] ?: break
+                val pid = rec.str(f) ?: throw RemoteException(RemoteException.Kind.SERVER, "Hijo sin referencia a su padre en ${key.table}")
+                key = Key(pt, pid)
+            }
+        }
     }
 
     private class Downloaded(val records: List<RemoteRecord>, val cursor: Long)

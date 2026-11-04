@@ -52,6 +52,8 @@ class ImportIntegrityException(message: String) : Exception(message)
 object ImportPlanner {
     /** [local] = TODAS las filas locales del usuario (incluidos borrados lógicos), leídas en una transacción coherente. */
     fun plan(parsed: ParsedExport, local: Collection<Rec>, activeUid: String, ownerIdentity: String = activeUid): ImportPlan {
+        // N-03: la cuenta con la que se interpreta el archivo y la de la operación deben ser la misma (misma captura, antes de suspender)
+        if (ownerIdentity != activeUid && ownerIdentity.substringBefore('|') != activeUid) throw IdentityChangedException()
         val idx = RecIndex(local)
         val identity = when {
             parsed.fileUserId == null -> Identity.UNKNOWN

@@ -158,6 +158,8 @@ class MemStore : RecStore {
     override fun liveIdentity(): String? = live
     /** Filas que pertenecen a OTRA cuenta del mismo dispositivo (aislamiento entre usuarios, H2). */
     val foreign = linkedMapOf<Key, String>()
+    /** Gancho de pruebas: se ejecuta dentro de la transacción al archivar (para cambiar la cuenta «durante» una resolución). */
+    var onArchive: (() -> Unit)? = null
     private val lookup = OwnerLookup { t, i -> foreign[Key(t, i)]?.let { Owner.User(it) } ?: if (Key(t, i) in rows) Owner.User(UID) else Owner.Absent }
     private fun guardWrite(rec: Rec) = OwnerGuard.checkWrite(UID, rec, lookup)
     val rows = linkedMapOf<Key, Rec>()
@@ -181,7 +183,7 @@ class MemStore : RecStore {
         override suspend fun conflicts(): List<ConflictGroup> = conflictGroups.values.toList()
         override suspend fun saveConflict(group: ConflictGroup) { tick(); conflictGroups[group.root] = group }
         override suspend fun removeConflict(root: Key) { conflictGroups.remove(root) }
-        override suspend fun archive(group: ConflictGroup, resolution: String, at: Long) { archived += Triple(group, resolution, at) }
+        override suspend fun archive(group: ConflictGroup, resolution: String, at: Long) { onArchive?.invoke(); archived += Triple(group, resolution, at) }
         override suspend fun meta(): SyncMeta = metaState
         override suspend fun setMeta(meta: SyncMeta) { metaState = meta }
     }

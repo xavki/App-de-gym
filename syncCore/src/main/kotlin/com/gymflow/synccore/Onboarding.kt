@@ -250,7 +250,8 @@ object ConflictResolver {
                     r != null && r.deletedAt == null -> put(Rec(r.table, r.id, now, tombstone(r, now), r.rev, dirty = true))   // solo en el servidor: se retira para converger a lo local
                 }
             }
-            archive(g, "KEEP_LOCAL", now); removeConflict(root)       // lo descartado aquí es la versión del servidor: queda en el grupo archivado
+            archive(g, "KEEP_LOCAL", now); removeConflict(root)
+            store.requireSame(store.boundIdentity)                 // N-04: también justo antes de confirmar       // lo descartado aquí es la versión del servidor: queda en el grupo archivado
         }
     }
 
@@ -279,6 +280,7 @@ object ConflictResolver {
             }
             cur.aggregate(root).filter { it.key !in inItems }.forEach { remove(it.table, it.id) }  // filas locales del agregado que el servidor no tiene (archivadas)
             removeConflict(root)
+            store.requireSame(store.boundIdentity)                 // N-04: también justo antes de confirmar
         }
     }
 
