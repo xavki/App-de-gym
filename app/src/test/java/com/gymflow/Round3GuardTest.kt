@@ -94,4 +94,26 @@ class Round3GuardTest {
         assertFalse("no debe volver a filtrar por has* global", imp.contains(".filterNot { repo.has"))
         assertTrue(text("data/GymRepository.kt").contains("suspend fun legacyOwner"))
     }
+
+    // ─── Ronda 5 ───
+    @Test fun `R4-02 la importacion heredada revalida dentro de la transaccion y propaga la cancelacion`() {
+        val imp = text("data/FirestoreImporter.kt")
+        assertTrue(imp.contains("atomically = { block -> repo.inTransaction(block) }"))
+        assertTrue(imp.contains("onComplete ="))
+        // la marca de «hecho» solo vive dentro de onComplete (que runLegacyImport ejecuta tras revalidar la cuenta)
+        val idx = imp.indexOf("putBoolean(key, true)"); assertTrue(idx > imp.indexOf("onComplete ="))
+        assertEquals(1, Regex("putBoolean\\(key, true\\)").findAll(imp).count())
+        // todo catch (e: Exception) del importador va precedido de la relectura de CancellationException
+        val catches = Regex("catch \\(e: (kotlinx\\.coroutines\\.)?(CancellationException|Exception)\\)").findAll(imp).map { it.groupValues[2] }.toList()
+        assertTrue(catches.zipWithNext().all { (a, b) -> b != "Exception" || a == "CancellationException" } && catches.first() == "CancellationException")
+    }
+
+    @Test fun `R4-03 las pantallas no usan el tamano de la lista como clave de cache`() {
+        for (f in listOf("ProgressScreens.kt", "ExerciseProgressScreen.kt", "PRBoardScreen.kt", "MuscleMapScreen.kt")) {
+            val t = text(f)
+            assertFalse("$f cachea con size del historial", Regex("""remember\([^)]*(history|workoutHistory)\.size""").containsMatchIn(t))
+            assertFalse("$f cachea con size de personalizados", Regex("""remember\([^)]*customExercises\.size""").containsMatchIn(t))
+        }
+        assertTrue(text("ProgressScreens.kt").contains("HistoryFingerprint.of(history)"))
+    }
 }

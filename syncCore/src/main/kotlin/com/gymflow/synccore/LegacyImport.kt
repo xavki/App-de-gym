@@ -30,28 +30,58 @@ data class LegacyReport(
     val complete: Boolean get() = failedAt == null
 }
 
+/** Entre decidir «escribir» y escribir, otra cuenta/proceso reclamó el id: se aborta ese agregado (el reintento lo reevaluará). */
+class LegacyOwnershipChangedException(val item: LegacyItem) : Exception("El propietario de ${item.table}/${item.id} cambió durante la importación")
+
+/**
+ * @param ownerOf   propietario REAL de una fila (consulta suspendible).
+ * @param write     escribe UN agregado. Se invoca SIEMPRE dentro de [atomically] y tras revalidar cuenta y propietario en esa misma unidad.
+ * @param atomically ejecuta su bloque en una unidad transaccional (en Android: `db.withTransaction`, que se une a las transacciones
+ *                  internas de cada `save*`). Si el bloque lanza, se revierte. Por defecto ejecuta el bloque tal cual (pruebas).
+ * @param onComplete se ejecuta una sola vez, solo si TODO terminó y la cuenta sigue activa (logros finales, marca de «hecho»…).
+ *
+ * Contrato de identidad (R4-02): se comprueba [stillActive] (1) antes de consultar el propietario, (2) después de consultarlo,
+ * (3) otra vez DENTRO de la transacción justo antes de persistir —junto con una relectura del propietario— y (4) antes de [onComplete].
+ * [CancellationException] siempre se propaga.
+ */
 suspend fun runLegacyImport(
     uid: String,
     items: List<LegacyItem>,
     ownerOf: suspend (LegacyItem) -> Owner,
     write: suspend (LegacyItem) -> Unit,
     stillActive: () -> Boolean,
+    atomically: suspend (suspend () -> Unit) -> Unit = { it() },
+    onComplete: suspend () -> Unit = {},
 ): LegacyReport {
     var written = 0; var already = 0
     val collisions = mutableListOf<LegacyItem>()
+    fun fail(item: LegacyItem, e: Throwable) = LegacyReport(written, already, collisions, item, e)
     for (item in items) {
-        if (!stillActive()) return LegacyReport(written, already, collisions, item, IdentityChangedException())
+        if (!stillActive()) return fail(item, IdentityChangedException())
         try {
-            when (LegacyImportPolicy.decide(uid, ownerOf(item))) {
+            val owner = ownerOf(item)
+            if (!stillActive()) return fail(item, IdentityChangedException())          // la cuenta cambió DURANTE la consulta
+            when (LegacyImportPolicy.decide(uid, owner)) {
                 LegacyDecision.ALREADY_IMPORTED -> already++
                 LegacyDecision.FOREIGN_COLLISION -> collisions += item
-                LegacyDecision.WRITE -> { write(item); written++ }
+                LegacyDecision.WRITE -> {
+                    atomically {
+                        if (!stillActive()) throw IdentityChangedException()                                 // justo antes de persistir
+                        if (LegacyImportPolicy.decide(uid, ownerOf(item)) != LegacyDecision.WRITE) throw LegacyOwnershipChangedException(item)
+                        if (!stillActive()) throw IdentityChangedException()
+                        write(item)
+                    }
+                    written++
+                }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            return LegacyReport(written, already, collisions, item, e)
+            return fail(item, e)
         }
     }
+    val last = LegacyItem("onComplete", "")
+    if (!stillActive()) return fail(last, IdentityChangedException())
+    try { onComplete() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { return fail(last, e) }
     return LegacyReport(written, already, collisions, null, null)
 }

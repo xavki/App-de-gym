@@ -47,7 +47,7 @@ fun PRBoardScreen(
     viewModel: GymFlowViewModel,
     onBack: () -> Unit
 ) {
-    val prs = remember(viewModel.workoutHistory.size) {
+    val prs = remember(HistoryFingerprint.of(viewModel.workoutHistory)) {
         computePRs(viewModel.workoutHistory)
     }
 

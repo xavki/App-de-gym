@@ -49,6 +49,8 @@ object FirestoreImporter {
             }
             repo.saveGlobalCatalog(items)
             repo.globalExercises()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo descargar el catálogo: ${e.message}")
             emptyList()
@@ -114,18 +116,29 @@ object FirestoreImporter {
                     ), at = old)
                 }
             }
-            val report = runLegacyImport(uid, steps.keys.toList(), ownerOf = { repo.legacyOwner(it.table, it.id) }, write = { steps.getValue(it)() }, stillActive = stillActive)
-            if (report.complete) {
-                // los logros llevan el uid dentro de su id estable: no pueden colisionar entre cuentas
-                achievements.forEach { doc ->
-                    val akey = doc.getString("id") ?: return@forEach
-                    if (repo.hasAchievement(uid, akey)) return@forEach
+            // Los logros son también agregados (id estable que incluye el uid): comparten la misma política, revalidación y transacción
+            achievements.forEach { doc ->
+                val akey = doc.getString("id") ?: return@forEach
+                steps[LegacyItem(Tables.ACHIEVEMENTS, GymRepository.stableUuid("$uid:achievement:$akey"))] = {
                     repo.unlockAchievement(uid, akey, doc.getDate("unlockedAt")?.time ?: old)
                 }
-                prefs(context).edit().putBoolean(key, true).apply()
-                Log.i(TAG, "Importación desde Firestore completada")
-            } else Log.w(TAG, "Importación incompleta (se puede reintentar)")
+            }
+            val report = runLegacyImport(
+                uid, steps.keys.toList(),
+                ownerOf = { repo.legacyOwner(it.table, it.id) },
+                write = { steps.getValue(it)() },
+                stillActive = stillActive,
+                atomically = { block -> repo.inTransaction(block) },     // la cuenta y el propietario se revalidan DENTRO de esta transacción
+                onComplete = {
+                    // última revalidación ya hecha por runLegacyImport; la marca es por uid
+                    prefs(context).edit().putBoolean(key, true).apply()
+                    Log.i(TAG, "Importación desde Firestore completada")
+                },
+            )
+            if (!report.complete) Log.w(TAG, "Importación incompleta (se puede reintentar)")
             return LegacyOutcome(report.complete, report.written, report.collisions)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e                                  // la cancelación no es un fallo de importación: se propaga al llamador
         } catch (e: Exception) {
             Log.w(TAG, "Importación incompleta (se puede reintentar)")
             return LegacyOutcome(false, 0, emptyList())

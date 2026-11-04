@@ -63,8 +63,8 @@ private const val GAP = 46f // separación entre figuras, en unidades del atlas
 private fun series(n: Int) = if (n == 1) "1 serie" else "$n series"
 
 @Composable
-fun MuscleMapCard(history: List<WorkoutSession>, catalog: Map<String, Pair<String, String>>) {
-    val activity = remember(history.size, catalog.size) { MuscleActivity.compute(history, catalog) }
+fun MuscleMapCard(history: List<WorkoutSession>, catalog: Map<String, Pair<String, String>>, contentKey: Long) {
+    val activity = remember(contentKey, catalog.size) { MuscleActivity.compute(history, catalog) }
     val colors = MapColors(LocalPalette.current)
     // En horizontal la altura manda: las figuras no pasan de media pantalla
     val windowH = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }

@@ -52,7 +52,7 @@ fun ExerciseProgressScreen(
     viewModel: GymFlowViewModel,
     onBack: () -> Unit
 ) {
-    val history = remember(viewModel.workoutHistory.size, exerciseName) {
+    val history = remember(HistoryFingerprint.of(viewModel.workoutHistory), exerciseName) {
         buildExerciseTimeline(exerciseName, viewModel.workoutHistory)
     }
 

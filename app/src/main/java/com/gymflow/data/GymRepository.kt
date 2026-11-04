@@ -323,12 +323,16 @@ class GymRepository(private val db: GymDatabase) {
     suspend fun hasMeasurement(id: String) = syncDao.findMeasurement(id) != null
     suspend fun hasExercise(id: String) = syncDao.findExercise(id) != null
     suspend fun hasSchedule(id: String) = syncDao.findSchedule(id) != null
+    /** Ejecuta [block] en UNA transacción de Room (las `save*` internas se unen a ella); si lanza, todo se revierte. */
+    suspend fun inTransaction(block: suspend () -> Unit) { db.withTransaction { block() } }
+
     /** Propietario REAL de una fila por id (para no confundir una colisión de otra cuenta con «ya importado»). */
     suspend fun legacyOwner(table: String, id: String): Owner = when (table) {
         Tables.ROUTINES -> syncDao.findRoutine(id)?.let { Owner.User(it.userId) }
         Tables.WORKOUTS -> syncDao.findWorkout(id)?.let { Owner.User(it.userId) }
         Tables.BODY_MEASUREMENTS -> syncDao.findMeasurement(id)?.let { Owner.User(it.userId) }
         Tables.SCHEDULES -> syncDao.findSchedule(id)?.let { Owner.User(it.userId) }
+        Tables.ACHIEVEMENTS -> syncDao.findAchievement(id)?.let { Owner.User(it.userId) }
         Tables.EXERCISES -> syncDao.findExercise(id)?.let { e -> e.userId?.let { Owner.User(it) } ?: Owner.Global }
         else -> error("Tabla no admitida en la importación heredada: $table")
     } ?: Owner.Absent

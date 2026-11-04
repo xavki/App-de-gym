@@ -127,9 +127,10 @@ private fun WorkoutRow(w: WorkoutSession, onClick: (() -> Unit)? = null) {
 @Composable
 fun HomeTab(viewModel: GymFlowViewModel, onContinueWorkout: () -> Unit, onGoTrain: () -> Unit, onGoProgress: () -> Unit) {
     val history = viewModel.workoutHistory
+    val historyKey = HistoryFingerprint.of(history)      // contenido, no tamaño (R4-03)
     val now = System.currentTimeMillis()
-    val week = remember(history.size) { TrainingStats.inPeriod(history, TrainingStats.Period.WEEK, now) }
-    val sorted = remember(history.size) { history.sortedByDescending { it.date.time } }
+    val week = remember(historyKey) { TrainingStats.inPeriod(history, TrainingStats.Period.WEEK, now) }
+    val sorted = remember(historyKey) { history.sortedByDescending { it.date.time } }
     val active = viewModel.activeWorkout
 
     LazyColumn(
@@ -214,18 +215,19 @@ fun HomeTab(viewModel: GymFlowViewModel, onContinueWorkout: () -> Unit, onGoTrai
 fun ProgressTab(viewModel: GymFlowViewModel, onOpenPRBoard: () -> Unit, onExerciseProgress: (String) -> Unit) {
     var period by rememberSaveable { mutableStateOf(TrainingStats.Period.QUARTER) }
     val history = viewModel.workoutHistory
-    val now = remember(history.size) { System.currentTimeMillis() }
+    val historyKey = HistoryFingerprint.of(history)      // contenido, no tamaño (R4-03)
+    val now = remember(historyKey) { System.currentTimeMillis() }
     // Grupo muscular de cada ejercicio: catálogo (y ejercicios personalizados)
-    val groups = remember(viewModel.customExercises.size) {
+    val groups = remember(viewModel.customExercises.toList()) {
         ExerciseRepository.getCached().associate { it.name to ExerciseNamesEs.group(it.mainGroup) } +
             viewModel.customExercises.associate { it.name to it.mainGroup }
     }
     // Todo se recalcula solo al cambiar el periodo o el historial, no en cada recomposición
-    val inPeriod = remember(history.size, period) { TrainingStats.inPeriod(history, period, now) }
+    val inPeriod = remember(historyKey, period) { TrainingStats.inPeriod(history, period, now) }
     val summary = remember(inPeriod) { TrainingStats.summary(inPeriod, period, now, history) }
     val buckets = remember(inPeriod) { TrainingStats.buckets(inPeriod, period, now, history) }
     val byGroup = remember(inPeriod, groups) { TrainingStats.setsByGroup(inPeriod) { groups[it] } }
-    val records = remember(history.size) { TrainingStats.records(history) }
+    val records = remember(historyKey) { TrainingStats.records(history) }
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -322,8 +324,8 @@ fun ProgressTab(viewModel: GymFlowViewModel, onOpenPRBoard: () -> Unit, onExerci
             }
         }
         item {
-            val catalog = remember(viewModel.customExercises.size, ExerciseRepository.getCached().size) { muscleCatalog(ExerciseRepository.getCached(), viewModel.customExercises) }
-            MuscleMapCard(history = history, catalog = catalog)
+            val catalog = remember(viewModel.customExercises.toList(), ExerciseRepository.getCached().size) { muscleCatalog(ExerciseRepository.getCached(), viewModel.customExercises) }
+            MuscleMapCard(history = history, catalog = catalog, contentKey = historyKey)
         }
     }
 }

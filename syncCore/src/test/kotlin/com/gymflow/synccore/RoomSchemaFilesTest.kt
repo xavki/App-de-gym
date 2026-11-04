@@ -21,7 +21,29 @@ import kotlinx.serialization.json.jsonPrimitive
 class RoomSchemaFilesTest {
     private val dir = File("../app/schemas/com.gymflow.data.GymDatabase")
     private fun db(v: Int): JsonObject = Json.parseToJsonElement(File(dir, "$v.json").readText()).jsonObject["database"]!!.jsonObject
-    private fun sha(v: Int) = MessageDigest.getInstance("SHA-256").digest(File(dir, "$v.json").readBytes()).joinToString("") { "%02x".format(it) }
+    /**
+     * SHA-256 del contenido auténtico (LF). `.gitattributes` fija `eol=lf` para estos JSON, así que un checkout Windows los conserva en LF;
+     * además, por robustez ante copias/zip que sí conviertan, se normaliza CRLF→LF antes de calcular: la suma esperada sigue siendo la
+     * AUTÉNTICA del blob (no una suma CRLF local) y la identidad/estructura se comprueban igualmente.
+     */
+    private fun sha(v: Int): String {
+        val raw = File(dir, "$v.json").readBytes()
+        val lf = String(raw, Charsets.ISO_8859_1).replace("\r\n", "\n").toByteArray(Charsets.ISO_8859_1)
+        return MessageDigest.getInstance("SHA-256").digest(lf).joinToString("") { "%02x".format(it) }
+    }
+
+    @Test fun `gitattributes fija LF para los esquemas JSON`() {
+        val attrs = File("../.gitattributes").readText().replace("\r\n", "\n")
+        assertTrue(attrs.lines().any { it.trim() == "app/schemas/**/*.json text eol=lf" })
+    }
+
+    @Test fun `el hash auténtico se obtiene tambien si el checkout fuese CRLF`() {
+        val lf = File(dir, "3.json").readBytes()
+        val crlf = String(lf, Charsets.ISO_8859_1).replace("\n", "\r\n").toByteArray(Charsets.ISO_8859_1)
+        fun h(b: ByteArray) = MessageDigest.getInstance("SHA-256").digest(String(b, Charsets.ISO_8859_1).replace("\r\n", "\n").toByteArray(Charsets.ISO_8859_1)).joinToString("") { "%02x".format(it) }
+        assertEquals(h(lf), h(crlf))
+        assertTrue(!MessageDigest.getInstance("SHA-256").digest(crlf).contentEquals(MessageDigest.getInstance("SHA-256").digest(lf)))   // el bruto sí difiere
+    }
 
     @Test fun `integridad e identidad de los esquemas 3 y 4`() {
         assertEquals("6c67f70849278a6de558fe0a674eb50bdb8416b6a8ad97afd27d10bb979b6296", sha(3))

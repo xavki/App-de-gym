@@ -11,7 +11,7 @@ import com.gymflow.data.DataExporter
 import com.gymflow.data.FirestoreImporter
 import com.gymflow.data.GymRepository
 import com.gymflow.sync.DataEvents
-import com.gymflow.synccore.ReloadGate
+import com.gymflow.synccore.ListPublisher
 import com.gymflow.sync.SyncManager
 import com.gymflow.sync.SyncState
 import kotlinx.coroutines.*
@@ -400,10 +400,11 @@ class GymFlowViewModel(
 
     /** Una puerta por lista: solo la última recarga de la cuenta activa puede publicar (ver ReloadGate). */
     private class Gates {
-        val routines = ReloadGate(); val history = ReloadGate(); val schedules = ReloadGate()
-        val measurements = ReloadGate(); val customs = ReloadGate(); val achievements = ReloadGate()
+        val routines = ListPublisher<WorkoutSession>(); val history = ListPublisher<WorkoutSession>(); val schedules = ListPublisher<ScheduledRoutine>()
+        val measurements = ListPublisher<BodyMeasurement>(); val customs = ListPublisher<CustomExercise>(); val achievements = ListPublisher<Achievement>()
         fun invalidateAll() = listOf(routines, history, schedules, measurements, customs, achievements).forEach { it.invalidate() }
     }
+
     fun clearData() {
         gates.invalidateAll()           // las recargas en vuelo de la cuenta anterior no pueden repoblar las listas
         // Al cerrar sesión el entreno en curso queda en el borrador de su usuario (no se pierde)
@@ -413,11 +414,12 @@ class GymFlowViewModel(
         activeWorkoutUid = null
         stopTimer()
         routines.clear()
-        workoutHistory.clear()
+        gates.history.clear(workoutHistory)
         scheduledRoutines.clear()
         bodyMeasurements.clear()
-        customExercises.clear()
+        gates.customs.clear(customExercises)
         achievements.clear()
+        isLoadingRoutines = false; isLoadingHistory = false; isLoadingMeasurements = false     // una recarga descartada no deja «cargando» para siempre
         selectedRoutine = null
         selectedExercise = null
         tempExercises.clear()
@@ -505,9 +507,7 @@ class GymFlowViewModel(
         viewModelScope.launch {
             val t = gates.schedules.begin()
             val loaded = repo.schedules(uid)
-            if (!gates.schedules.canPublish(t, uid, auth.currentUser?.uid)) return@launch
-            scheduledRoutines.clear()
-            scheduledRoutines.addAll(loaded)
+            gates.schedules.publish(scheduledRoutines, t, uid, auth.currentUser?.uid, loaded)
         }
     }
 
@@ -559,9 +559,7 @@ class GymFlowViewModel(
         isLoadingRoutines = true
         val t = gates.routines.begin()
         val loaded = repo.routines(uid)
-        if (!gates.routines.canPublish(t, uid, auth.currentUser?.uid)) return     // obsoleta: otra recarga más nueva o la cuenta cambió
-        routines.clear()
-        routines.addAll(loaded)
+        if (!gates.routines.publish(routines, t, uid, auth.currentUser?.uid, loaded)) return     // obsoleta: otra recarga más nueva o la cuenta cambió
         isLoadingRoutines = false
     }
 
@@ -569,9 +567,7 @@ class GymFlowViewModel(
         isLoadingHistory = true
         val t = gates.history.begin()
         val loaded = repo.workouts(uid)
-        if (!gates.history.canPublish(t, uid, auth.currentUser?.uid)) return
-        workoutHistory.clear()
-        workoutHistory.addAll(loaded)
+        if (!gates.history.publish(workoutHistory, t, uid, auth.currentUser?.uid, loaded)) return
         isLoadingHistory = false
     }
 
@@ -676,9 +672,7 @@ class GymFlowViewModel(
         viewModelScope.launch {
             val t = gates.measurements.begin()
             val loaded = repo.measurements(uid)
-            if (!gates.measurements.canPublish(t, uid, auth.currentUser?.uid)) return@launch
-            bodyMeasurements.clear()
-            bodyMeasurements.addAll(loaded)
+            if (!gates.measurements.publish(bodyMeasurements, t, uid, auth.currentUser?.uid, loaded)) return@launch
             isLoadingMeasurements = false
         }
     }
@@ -713,9 +707,8 @@ class GymFlowViewModel(
         viewModelScope.launch {
             val t = gates.customs.begin()
             val loaded = repo.customExercises(uid)
-            if (!gates.customs.canPublish(t, uid, auth.currentUser?.uid)) return@launch
-            customExercises.clear()
-            customExercises.addAll(loaded)
+            if (!gates.customs.publish(customExercises, t, uid, auth.currentUser?.uid, loaded)) return@launch
+
         }
     }
 
@@ -767,9 +760,7 @@ class GymFlowViewModel(
         viewModelScope.launch {
             val t = gates.achievements.begin()
             val loaded = repo.achievements(uid)
-            if (!gates.achievements.canPublish(t, uid, auth.currentUser?.uid)) return@launch
-            achievements.clear()
-            achievements.addAll(loaded)
+            gates.achievements.publish(achievements, t, uid, auth.currentUser?.uid, loaded)
         }
     }
 
