@@ -77,11 +77,11 @@ class RoomStoresTest {
         val st = store()
         val json = """{"schemaVersion":1,"userId":"$uid","bodyMeasurements":[
             {"id":"44444444-4444-4444-4444-444444444444","measuredAt":"2026-01-01T00:00:00Z","weightKg":80.0,"bodyFatPct":15.0,"chestCm":100.0,"waistCm":85.0,"hipsCm":95.0,"bicepCm":35.0,"thighCm":55.0}]}"""
-        val plan = ImportPlanner.plan(ExportParser.parse(json.toByteArray(), uid), st.transaction { all() }, uid)
+        val plan = ImportPlanner.plan(ExportParser.parse(json.toByteArray(), uid), st.transaction { all() }, uid, ownerIdentity = st.boundIdentity)
         assertEquals(1, plan.newCount)
         ImportExecutor.apply(st, plan, ImportChoices())
         assertEquals(1, st.transaction { all() }.size)
-        val again = ImportPlanner.plan(ExportParser.parse(json.toByteArray(), uid), st.transaction { all() }, uid)
+        val again = ImportPlanner.plan(ExportParser.parse(json.toByteArray(), uid), st.transaction { all() }, uid, ownerIdentity = st.boundIdentity)
         assertEquals(0, again.newCount); assertEquals(1, again.identicalCount)
         val existing = st.transaction { all() }.first()
         assertTrue(runCatching { st.transaction { insert(existing) } }.isFailure)      // insertar algo que ya existe falla y se revierte

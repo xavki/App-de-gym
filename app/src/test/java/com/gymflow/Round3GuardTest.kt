@@ -10,7 +10,15 @@ import org.junit.Test
 class Round3GuardTest {
     private val dir = File("src/main/java/com/gymflow")
     private fun all() = dir.walkTopDown().filter { it.extension == "kt" }.toList()
-    private fun text(rel: String) = File(dir, rel).readText()
+    /** Lee con finales de línea normalizados (LF): el mismo fuente en un checkout CRLF de Windows debe dar el mismo resultado (R3-01). */
+    private fun text(rel: String) = File(dir, rel).readText().replace("\r\n", "\n")
+
+    /** Texto desde [start] hasta la primera línea en blanco, con LF o CRLF. Falla (no devuelve -1 silencioso) si no hay línea en blanco. */
+    private fun untilBlankLine(src: String, start: Int): String {
+        require(start >= 0) { "inicio no encontrado" }
+        val m = Regex("""\r?\n[ \t]*\r?\n""").find(src, start) ?: return src.substring(start)
+        return src.substring(start, m.range.first)
+    }
 
     @Test fun `N-01 todo uso de await de Task tiene una extension visible`() {
         for (f in all()) {
@@ -24,8 +32,7 @@ class Round3GuardTest {
 
     @Test fun `N-02 la importacion local no depende del servidor`() {
         val svc = text("sync/SyncService.kt")
-        val start = svc.indexOf("private fun importStore"); val end = svc.indexOf("\n\n", start)
-        val body = svc.substring(start, end)
+        val body = untilBlankLine(svc, svc.indexOf("private fun importStore"))
         assertFalse("importStore no debe usar la URL del servidor", body.contains("serverKey(") || body.contains("liveIdentity("))
         assertTrue(body.contains("liveLocalIdentity"))
         // y la cuenta se captura una sola vez antes de suspender
@@ -54,5 +61,37 @@ class Round3GuardTest {
         val vm = text("ImportSyncViewModel.kt")
         assertTrue(vm.contains("addAuthStateListener(authListener)"))
         assertTrue(vm.contains("removeAuthStateListener(authListener)"))
+    }
+
+    // ─── R3-01: la extracción de bloques funciona con LF y con CRLF ───
+    private val sample = "private fun importStore(a: A) =\n    X(a) { liveLocalIdentity() }\n\nprivate fun otra() = serverKey()\n"
+
+    @Test fun `R3-01 el bloque se extrae igual con LF y con CRLF`() {
+        val lf = sample; val crlf = sample.replace("\n", "\r\n")
+        val a = untilBlankLine(lf, lf.indexOf("private fun importStore"))
+        val b = untilBlankLine(crlf, crlf.indexOf("private fun importStore"))
+        assertEquals(a.replace("\r", ""), b.replace("\r", ""))
+        assertTrue(a.contains("liveLocalIdentity") && !a.contains("serverKey"))
+        assertTrue(b.contains("liveLocalIdentity") && !b.contains("serverKey"))
+    }
+
+    @Test fun `R3-01 la guarda sigue detectando una dependencia del servidor con ambos finales de linea`() {
+        for (nl in listOf("\n", "\r\n")) {
+            val malo = "private fun importStore(a: A) =${nl}    X(a) { liveIdentity(app) }${nl}${nl}fun z() {}${nl}"
+            val body = untilBlankLine(malo, malo.indexOf("private fun importStore"))
+            assertTrue(body.contains("liveIdentity("))      // el defecto N-02 se detectaría
+            assertFalse(body.contains("fun z"))
+        }
+    }
+
+    @Test fun `R3-01 el lector de fuentes entrega siempre LF`() {
+        assertFalse(text("sync/SyncService.kt").contains("\r"))
+    }
+
+    @Test fun `importacion heredada incremental usa la politica y el propietario real`() {
+        val imp = text("data/FirestoreImporter.kt")
+        assertTrue(imp.contains("runLegacyImport(") && imp.contains("legacyOwner("))
+        assertFalse("no debe volver a filtrar por has* global", imp.contains(".filterNot { repo.has"))
+        assertTrue(text("data/GymRepository.kt").contains("suspend fun legacyOwner"))
     }
 }

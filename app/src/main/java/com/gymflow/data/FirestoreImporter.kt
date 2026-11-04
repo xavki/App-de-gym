@@ -10,6 +10,9 @@ import com.gymflow.ExerciseDefinition
 import com.gymflow.RecurrenceType
 import com.gymflow.ScheduledRoutine
 import com.gymflow.WorkoutSession
+import com.gymflow.synccore.LegacyItem
+import com.gymflow.synccore.Tables
+import com.gymflow.synccore.runLegacyImport
 
 /**
  * Migración única desde Firestore a Room. Firestore ya no recibe escrituras de
@@ -69,12 +72,12 @@ object FirestoreImporter {
      * Los ids de Firestore se convierten en UUID estables y lo que ya existe se salta → reintentar o importar antes/después de la
      * sincronización no duplica. Lo importado lleva la fecha antigua IMPORTED_AT para que cualquier edición real gane.
      */
-    suspend fun importUserDataWithConsent(context: Context, repo: GymRepository, db: FirebaseFirestore, uid: String, consent: LegacyConsent, stillActive: () -> Boolean): Boolean {
+    suspend fun importUserDataWithConsent(context: Context, repo: GymRepository, db: FirebaseFirestore, uid: String, consent: LegacyConsent, stillActive: () -> Boolean): LegacyOutcome {
         require(consent.uid == uid) { "El consentimiento es de otra cuenta" }
         val key = "firestore_import_done_$uid"
-        if (prefs(context).getBoolean(key, false)) return true
+        if (prefs(context).getBoolean(key, false)) return LegacyOutcome(true, 0, emptyList())
         try {
-            if (!stillActive()) return false
+            if (!stillActive()) return LegacyOutcome(false, 0, emptyList())
             ensureCatalog(repo, db)                 // catálogo global (no es dato personal), para enlazar exerciseId por nombre
             val user = db.collection("users").document(uid)
             // FASE 1: lectura completa. Source.SERVER: sin conexión Firestore devolvería su caché (quizá vacía)
@@ -84,40 +87,51 @@ object FirestoreImporter {
             val measures = user.collection("body_measurements").get(Source.SERVER).await().toObjects(BodyMeasurement::class.java)
             val schedules = user.collection("schedules").get(Source.SERVER).await().documents
             val achievements = user.collection("achievements").get(Source.SERVER).await().documents
-            if (!stillActive()) return false         // la cuenta cambió mientras se leía: no se guarda nada
-            // FASE 2: guardado (con ids estables y sin pisar lo existente)
+            if (!stillActive()) return LegacyOutcome(false, 0, emptyList())   // la cuenta cambió mientras se leía: no se guarda nada
+            // FASE 2: guardado INCREMENTAL, agregado a agregado (cada uno en su transacción). No es globalmente atómico: si uno falla,
+            // lo ya escrito se conserva y el reintento lo reconoce (ids estables). Una colisión de id con otra cuenta se omite y se informa.
             val old = GymRepository.IMPORTED_AT
             val id = GymRepository::stableUuid
-            customs.map { it.copy(id = id(it.id)) }.filterNot { repo.hasExercise(it.id) }.forEach { repo.saveCustomExercise(uid, it, at = old) }
-            routines.map { it.copy(id = id(it.id)) }.filterNot { repo.hasRoutine(it.id) }.forEach { repo.saveRoutine(uid, it, at = old) }
+            val steps = linkedMapOf<LegacyItem, suspend () -> Unit>()
+            customs.map { it.copy(id = id(it.id)) }.forEach { c -> steps[LegacyItem(Tables.EXERCISES, c.id)] = { repo.saveCustomExercise(uid, c, at = old) } }
+            routines.map { it.copy(id = id(it.id)) }.forEach { r -> steps[LegacyItem(Tables.ROUTINES, r.id)] = { repo.saveRoutine(uid, r, at = old) } }
             workouts.forEach { doc ->
                 val w = doc.toObject(WorkoutSession::class.java) ?: return@forEach
                 val workoutId = id(doc.id)
-                if (repo.hasWorkout(workoutId)) return@forEach
-                repo.saveWorkout(uid = uid, session = w, routineId = null, workoutId = workoutId, startedAt = w.date.time, onlyLoggedSets = false, createdAt = w.date.time)
+                steps[LegacyItem(Tables.WORKOUTS, workoutId)] = {
+                    repo.saveWorkout(uid = uid, session = w, routineId = null, workoutId = workoutId, startedAt = w.date.time, onlyLoggedSets = false, createdAt = w.date.time)
+                }
             }
-            measures.map { it.copy(id = id(it.id)) }.filterNot { repo.hasMeasurement(it.id) }.forEach { repo.saveMeasurement(uid, it, at = old) }
+            measures.map { it.copy(id = id(it.id)) }.forEach { m -> steps[LegacyItem(Tables.BODY_MEASUREMENTS, m.id)] = { repo.saveMeasurement(uid, m, at = old) } }
             schedules.forEach { doc ->
                 val scheduleId = id(doc.getString("id") ?: doc.id)
-                if (repo.hasSchedule(scheduleId)) return@forEach
-                repo.saveSchedule(uid, ScheduledRoutine(
-                    id = scheduleId, routineId = doc.getString("routineId") ?: "", routineName = doc.getString("routineName") ?: "",
-                    startDate = doc.getLong("startDate") ?: 0L, hourOfDay = (doc.getLong("hourOfDay") ?: 8L).toInt(), minute = (doc.getLong("minute") ?: 0L).toInt(),
-                    recurrenceType = doc.getString("recurrenceType") ?: RecurrenceType.ONCE, intervalDays = (doc.getLong("intervalDays") ?: 1L).toInt(),
-                    weekDay = (doc.getLong("weekDay") ?: 2L).toInt(), endDate = doc.getLong("endDate") ?: 0L, userId = uid
-                ), at = old)
+                steps[LegacyItem(Tables.SCHEDULES, scheduleId)] = {
+                    repo.saveSchedule(uid, ScheduledRoutine(
+                        id = scheduleId, routineId = doc.getString("routineId") ?: "", routineName = doc.getString("routineName") ?: "",
+                        startDate = doc.getLong("startDate") ?: 0L, hourOfDay = (doc.getLong("hourOfDay") ?: 8L).toInt(), minute = (doc.getLong("minute") ?: 0L).toInt(),
+                        recurrenceType = doc.getString("recurrenceType") ?: RecurrenceType.ONCE, intervalDays = (doc.getLong("intervalDays") ?: 1L).toInt(),
+                        weekDay = (doc.getLong("weekDay") ?: 2L).toInt(), endDate = doc.getLong("endDate") ?: 0L, userId = uid
+                    ), at = old)
+                }
             }
-            achievements.forEach { doc ->
-                val akey = doc.getString("id") ?: return@forEach
-                if (repo.hasAchievement(uid, akey)) return@forEach
-                repo.unlockAchievement(uid, akey, doc.getDate("unlockedAt")?.time ?: old)
-            }
-            prefs(context).edit().putBoolean(key, true).apply()
-            Log.i(TAG, "Importación desde Firestore completada")
-            return true
+            val report = runLegacyImport(uid, steps.keys.toList(), ownerOf = { repo.legacyOwner(it.table, it.id) }, write = { steps.getValue(it)() }, stillActive = stillActive)
+            if (report.complete) {
+                // los logros llevan el uid dentro de su id estable: no pueden colisionar entre cuentas
+                achievements.forEach { doc ->
+                    val akey = doc.getString("id") ?: return@forEach
+                    if (repo.hasAchievement(uid, akey)) return@forEach
+                    repo.unlockAchievement(uid, akey, doc.getDate("unlockedAt")?.time ?: old)
+                }
+                prefs(context).edit().putBoolean(key, true).apply()
+                Log.i(TAG, "Importación desde Firestore completada")
+            } else Log.w(TAG, "Importación incompleta (se puede reintentar)")
+            return LegacyOutcome(report.complete, report.written, report.collisions)
         } catch (e: Exception) {
             Log.w(TAG, "Importación incompleta (se puede reintentar)")
-            return false
+            return LegacyOutcome(false, 0, emptyList())
         }
     }
+
+    /** Resultado para la UI: [complete] = terminó sin fallos; [collisions] = registros omitidos por tener su id otra cuenta. */
+    data class LegacyOutcome(val complete: Boolean, val written: Int, val collisions: List<LegacyItem>)
 }

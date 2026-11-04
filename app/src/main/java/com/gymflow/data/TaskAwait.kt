@@ -1,15 +1,19 @@
 package com.gymflow.data
 
 import com.google.android.gms.tasks.Task
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlinx.coroutines.suspendCancellableCoroutine
+import com.gymflow.synccore.awaitCallbacks
 
 /**
  * Espera un [Task] de Google Play services sin añadir dependencias (el proyecto no usa kotlinx-coroutines-play-services).
- * Si la corrutina se cancela, el resultado tardío se ignora; los errores del Task se propagan tal cual.
+ *
+ * Comportamiento de cancelación (la lógica vive en `awaitCallbacks`, probada en la JVM):
+ *  · Task completado → devuelve su resultado; Task con excepción → la relanza.
+ *  · Task cancelado (`addOnCanceledListener`), ya antes de esperar o mientras se espera → lanza CancellationException de inmediato.
+ *  · Corrutina llamadora cancelada → deja de esperar; un resultado tardío del Task se ignora.
+ *  · Carreras: solo cuenta el primer desenlace.
  */
-internal suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
-    addOnSuccessListener { if (cont.isActive) cont.resume(it) }
-    addOnFailureListener { if (cont.isActive) cont.resumeWithException(it) }
+internal suspend fun <T> Task<T>.await(): T = awaitCallbacks { sink ->
+    addOnSuccessListener { sink.success(it) }
+    addOnFailureListener { sink.failure(it) }
+    addOnCanceledListener { sink.cancelled() }
 }
