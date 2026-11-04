@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         BodyMeasurementEntity::class, ScheduleEntity::class, AchievementEntity::class,
         SyncRevEntity::class, SyncStateEntity::class, SyncConflictEntity::class, SyncArchiveEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class GymDatabase : RoomDatabase() {

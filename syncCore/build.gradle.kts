@@ -23,6 +23,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     testImplementation(kotlin("test-junit5"))
+    testImplementation("org.xerial:sqlite-jdbc:3.46.1.0")   // solo pruebas: ejecuta el SQL real de las migraciones en SQLite
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
 

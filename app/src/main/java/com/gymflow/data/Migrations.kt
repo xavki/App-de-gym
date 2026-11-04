@@ -2,6 +2,7 @@ package com.gymflow.data
 
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.gymflow.synccore.RoomMigrationSql
 
 object Migrations {
 
@@ -83,12 +84,22 @@ object Migrations {
      */
     val MIGRATION_2_3 = object : Migration(2, 3) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("CREATE TABLE IF NOT EXISTS `sync_revs` (`userId` TEXT NOT NULL, `serverKey` TEXT NOT NULL, `tableName` TEXT NOT NULL, `id` TEXT NOT NULL, `rev` INTEGER NOT NULL, PRIMARY KEY(`userId`, `serverKey`, `tableName`, `id`))")
+            db.execSQL(RoomMigrationSql.SYNC_REVS_V3)      // la v3 distribuida: no se altera retroactivamente (ver MIGRATION_3_4)
             db.execSQL("CREATE TABLE IF NOT EXISTS `sync_state` (`userId` TEXT NOT NULL, `serverKey` TEXT NOT NULL, `cursor` INTEGER NOT NULL, `onboarded` INTEGER NOT NULL, `lastSuccessAt` INTEGER, `lastErrorKind` TEXT, PRIMARY KEY(`userId`, `serverKey`))")
             db.execSQL("CREATE TABLE IF NOT EXISTS `sync_conflicts` (`userId` TEXT NOT NULL, `serverKey` TEXT NOT NULL, `rootTable` TEXT NOT NULL, `rootId` TEXT NOT NULL, `groupJson` TEXT NOT NULL, PRIMARY KEY(`userId`, `serverKey`, `rootTable`, `rootId`))")
             db.execSQL("CREATE TABLE IF NOT EXISTS `sync_archive` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `serverKey` TEXT NOT NULL, `rootTable` TEXT NOT NULL, `rootId` TEXT NOT NULL, `resolution` TEXT NOT NULL, `at` INTEGER NOT NULL, `groupJson` TEXT NOT NULL, PRIMARY KEY(`id`))")
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+    /**
+     * v3 → v4: `sync_revs` pasa a clave (userId, serverKey, tableName, id) para aislar las revisiones por cuenta. Conserva las revisiones
+     * existentes asignándolas a su usuario propietario. No toca ninguna tabla de datos. Sin migración destructiva.
+     */
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            RoomMigrationSql.MIGRATE_3_4.forEach { db.execSQL(it) }
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 }
