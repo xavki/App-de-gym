@@ -15,16 +15,23 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.gymflow.data.GymDatabase
 import com.gymflow.data.GymRepository
+import java.lang.reflect.Modifier
 import java.util.Date
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -34,6 +41,7 @@ import org.junit.runner.RunWith
 /**
  * R4-03 sobre los composables REALES de Inicio y Progreso. FirebaseApp ficticia (demo-gymflow), Room en memoria, sin sesión y sin red.
  * Reproduce el patrón de recarga clear()+addAll() con un entreno sustituto del MISMO id y el MISMO número de entrenos.
+ * R7-01: preparación determinista del ViewModel (callback inicial de FirebaseAuth sincronizado antes de sembrar) y limpieza con ViewModelStore.
  * R6-01/R6-02: ventana normal + scroll semántico (performScrollToNode) + assertIsDisplayed; descripción del mapa por igualdad completa y subcadena explícita.
  * NOTA DE API: `assertDoesNotExist()` es un MIEMBRO de SemanticsNodeInteraction (no una extensión importable): no lleva import. Para
  * «no existe» entre varios nodos se usa onAllNodesWithText(..).assertCountEquals(0).
@@ -45,16 +53,54 @@ class HomeProgressReloadTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var db: GymDatabase
     private lateinit var vm: GymFlowViewModel
+    private lateinit var auth: FirebaseAuth
+    private lateinit var app: FirebaseApp
+    private val store = ViewModelStore()                       // ciclo de vida de prueba: store.clear() => onCleared() => retira el listener
+    private val inst get() = InstrumentationRegistry.getInstrumentation()
 
+    /**
+     * R7-01: el ViewModel registra un AuthStateListener; FirebaseAuth encola su callback INICIAL (sin usuario => clearData()) en el hilo
+     * principal. Si el test siembra datos antes de que corra, ese callback vacía el historial. Preparación determinista:
+     *  1) crear el ViewModel en el hilo UI, dentro de un ViewModelStore de prueba;
+     *  2) en ese mismo bloque registrar un listener «sonda» DESPUÉS del suyo: su callback inicial se encola también en el hilo principal,
+     *     así que cuando la sonda se ejecuta (CountDownLatch, no una espera fija) el del ViewModel ya se ha ejecutado o está en la cola;
+     *  3) waitForIdleSync() vacía la cola del hilo principal: tras ello clearData() ya terminó;
+     *  4) solo entonces se siembran los datos (en el hilo UI) y se espera reposo de Compose.
+     * Sin Thread.sleep, sin esperas fijas ni reintentos. No se toca producción: el listener y clearData() siguen igual.
+     */
     @Before fun setUp() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
-        val app = FirebaseApp.getApps(ctx).firstOrNull { it.name == "round5" } ?: FirebaseApp.initializeApp(
-            ctx, FirebaseOptions.Builder().setProjectId("demo-gymflow").setApiKey("fake-api-key").setApplicationId("1:000000000000:android:0000000000000000").build(), "round5")
+        app = FirebaseApp.getApps(ctx).firstOrNull { it.name == "round5" } ?: FirebaseApp.initializeApp(
+            ctx, FirebaseOptions.Builder().setProjectId("demo-gymflow").setApiKey("fake-api-key").setApplicationId("1:000000000000:android:0000000000000000").build(), "round5")!!
+        auth = FirebaseAuth.getInstance(app)
         db = Room.inMemoryDatabaseBuilder(ctx, GymDatabase::class.java).allowMainThreadQueries().build()
-        vm = GymFlowViewModel(FirebaseAuth.getInstance(app), FirebaseFirestore.getInstance(app), GymRepository(db), ctx)
+        val initialCallbackSeen = CountDownLatch(1)
+        val probe = FirebaseAuth.AuthStateListener { initialCallbackSeen.countDown() }
+        inst.runOnMainSync {
+            val factory = object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    GymFlowViewModel(auth, FirebaseFirestore.getInstance(app), GymRepository(db), ctx) as T
+            }
+            vm = ViewModelProvider(store, factory)[GymFlowViewModel::class.java]
+            auth.addAuthStateListener(probe)                                  // DESPUÉS del listener del ViewModel
+        }
+        assertTrue("el callback inicial de FirebaseAuth no llegó (sincronización observable)", initialCallbackSeen.await(30, TimeUnit.SECONDS))
+        inst.waitForIdleSync()                                               // drena la cola principal: clearData() inicial ya ejecutado
+        auth.removeAuthStateListener(probe)
+        compose.waitForIdle()
     }
 
-    @After fun tearDown() { ExerciseRepository.replaceCached(emptyList()); db.close() }
+    @After fun tearDown() {
+        ExerciseRepository.replaceCached(emptyList())
+        inst.runOnMainSync { store.clear() }                                 // libera el ViewModel: onCleared() retira su listener
+        db.close()
+    }
+
+    private fun ui(block: () -> Unit) = inst.runOnMainSync(block)
+
+    /** Siembra DESPUÉS de la inicialización, en el hilo UI, y espera reposo de Compose. */
+    private fun seed(block: () -> Unit) { ui(block); compose.waitForIdle() }
 
     /**
      * Montaje con la ventana NORMAL del dispositivo (R6-01): ya no se fuerza un contenedor de 3000 dp. Los elementos que quedan fuera del
@@ -90,7 +136,7 @@ class HomeProgressReloadTest {
     @Test fun homeShowsReplacedWorkoutWithSameCountAndSameId() {
         val old = w("AUDIT OLD WORKOUT", weight = 100.0); val new = w("AUDIT NEW WORKOUT", weight = 125.0)
         assertEquals(800.0, TrainingStats.volume(old), 0.0); assertEquals(1000.0, TrainingStats.volume(new), 0.0)     // valores exactos
-        vm.workoutHistory.add(old)
+        seed { vm.workoutHistory.add(old) }
         mount { HomeTab(vm, onContinueWorkout = {}, onGoTrain = {}, onGoProgress = {}) }
         // estado anterior (precondición): fila de «Actividad reciente» y tile «Volumen», visibles
         shown("AUDIT OLD WORKOUT"); shown("${fmtVolume(800.0)} · 1 series"); shown(fmtVolume(800.0))
@@ -104,7 +150,7 @@ class HomeProgressReloadTest {
 
     @Test fun homeReflectsNameChangeAndDateChangeWithSameCount() {
         val now = System.currentTimeMillis(); val h = 3_600_000L
-        vm.workoutHistory.addAll(listOf(w("Alfa", date = now - 1 * h, id = "a"), w("Beta", date = now - 2 * h, id = "b")))
+        seed { vm.workoutHistory.addAll(listOf(w("Alfa", date = now - 1 * h, id = "a"), w("Beta", date = now - 2 * h, id = "b"))) }
         mount { HomeTab(vm, onContinueWorkout = {}, onGoTrain = {}, onGoProgress = {}) }
         shown("Alfa"); shown("Beta")                                   // visibles (la lista de actividad reciente es un único item)
         assertTrue("precondición: Alfa (más reciente) antes que Beta", top("Alfa") < top("Beta"))
@@ -124,7 +170,7 @@ class HomeProgressReloadTest {
         fun record(kg: Double, date: Long) = "1 sesiones · máx. ${fmtKg(kg)} × 8 · ${fmtDay(date)}"
         fun orm(kg: Double) = fmtKg(Math.round(TrainingStats.e1rm(kg, 8) * 10) / 10.0)
         assertEquals(480.0, TrainingStats.volume(w("x", weight = 60.0)) * 1.0, 0.0)          // 60 × 8
-        vm.workoutHistory.add(w("Push", weight = 60.0, date = day1))
+        seed { vm.workoutHistory.add(w("Push", weight = 60.0, date = day1)) }
         mount { ProgressTab(vm, onOpenPRBoard = {}, onExerciseProgress = {}) }
         // estado anterior
         shown(fmtVolume(480.0)); shown(display); shown(record(60.0, day1)); shown(orm(60.0))
@@ -139,7 +185,7 @@ class HomeProgressReloadTest {
     }
 
     // ─── R5-03 / R6-02: el mapa muscular sigue al CONTENIDO del catálogo con cardinalidad constante ───
-    private fun muscleHistory() = vm.workoutHistory.add(w("Mapa", exercise = "Ejercicio X", sets = 3, weight = 50.0, reps = 10, id = "m1"))
+    private fun muscleHistory() = seed { vm.workoutHistory.add(w("Mapa", exercise = "Ejercicio X", sets = 3, weight = 50.0, reps = 10, id = "m1")) }
     private val mapMatcher get() = hasContentDescription("Mapa muscular", substring = true)
     private fun map() = compose.onNodeWithContentDescription("Mapa muscular", substring = true)
 
@@ -163,7 +209,7 @@ class HomeProgressReloadTest {
 
     @Test fun muscleMapFollowsCustomExerciseGroupChangeWithSameCardinality() {
         muscleHistory()
-        vm.customExercises.add(CustomExercise(id = "c1", userId = "u", name = "Ejercicio X", mainGroup = "Pecho"))
+        seed { vm.customExercises.add(CustomExercise(id = "c1", userId = "u", name = "Ejercicio X", mainGroup = "Pecho")) }
         mount { ProgressTab(vm, onOpenPRBoard = {}, onExerciseProgress = {}) }
         assertMap(chest = 3, back = 0)
         // X pasa de Pecho a Espalda: mismo historial, mismo nº de ejercicios personalizados
@@ -182,5 +228,34 @@ class HomeProgressReloadTest {
         compose.waitForIdle()
         assertEquals(1, ExerciseRepository.getCached().size)
         assertMap(chest = 0, back = 3)
+    }
+
+    // ─── R7-01: liberar el ViewModel retira su listener de FirebaseAuth ───
+    /** Colecciones internas de FirebaseAuth que contienen AuthStateListener (localizadas por contenido, no por nombre ofuscado). */
+    private fun listenerCollections(): List<java.lang.reflect.Field> {
+        val out = mutableListOf<java.lang.reflect.Field>()
+        var c: Class<*>? = auth.javaClass
+        while (c != null && c != Any::class.java) {
+            for (f in c.declaredFields) {
+                if (Modifier.isStatic(f.modifiers)) continue
+                f.isAccessible = true
+                val v = try { f.get(auth) } catch (e: Exception) { null }
+                if (v is Collection<*> && v.any { it is FirebaseAuth.AuthStateListener }) out += f
+            }
+            c = c.superclass
+        }
+        return out
+    }
+
+    private fun gymflowListeners(fields: List<java.lang.reflect.Field>) = fields.sumOf { f ->
+        (f.get(auth) as Collection<*>).count { it != null && it.javaClass.name.startsWith("com.gymflow.GymFlowViewModel") }
+    }
+
+    @Test fun viewModelListenerIsRemovedWhenTheViewModelIsCleared() {
+        val fields = listenerCollections()
+        assertTrue("no se pudo localizar la colección de listeners de FirebaseAuth: la verificación de retirada no sería fiable", fields.isNotEmpty())
+        assertEquals("el ViewModel debe tener exactamente un listener registrado (sin fugas de tests anteriores)", 1, gymflowListeners(fields))
+        inst.runOnMainSync { store.clear() }                                 // onCleared() => auth.removeAuthStateListener(authListener)
+        assertEquals("tras liberar el ViewModel su listener debe haberse retirado", 0, gymflowListeners(fields))
     }
 }
