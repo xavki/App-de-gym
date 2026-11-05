@@ -40,8 +40,10 @@ class LegacyOwnershipChangedException(val item: LegacyItem) : Exception("El prop
  *                  internas de cada `save*`). Si el bloque lanza, se revierte. Por defecto ejecuta el bloque tal cual (pruebas).
  * @param onComplete se ejecuta una sola vez, solo si TODO terminó y la cuenta sigue activa (logros finales, marca de «hecho»…).
  *
- * Contrato de identidad (R4-02): se comprueba [stillActive] (1) antes de consultar el propietario, (2) después de consultarlo,
- * (3) otra vez DENTRO de la transacción justo antes de persistir —junto con una relectura del propietario— y (4) antes de [onComplete].
+ * Contrato de identidad (R4-02/R5-02): se comprueba [stillActive] (1) antes de consultar el propietario, (2) después de consultarlo,
+ * (3) DENTRO de la transacción antes de persistir —junto con una relectura del propietario—, (4) DENTRO de la transacción justo después de
+ * [write] (si cambió, se lanza y se revierte el agregado) y (5) antes de [onComplete]. [stillActive] debería basarse en un [SessionGuard]
+ * (UID + generación) para detectar también A→B→A. Queda una ventana mínima entre la última comprobación y el commit (ver SessionGuard).
  * [CancellationException] siempre se propaga.
  */
 suspend fun runLegacyImport(
@@ -70,6 +72,9 @@ suspend fun runLegacyImport(
                         if (LegacyImportPolicy.decide(uid, ownerOf(item)) != LegacyDecision.WRITE) throw LegacyOwnershipChangedException(item)
                         if (!stillActive()) throw IdentityChangedException()
                         write(item)
+                        // write es suspendible: la cuenta pudo cambiar mientras esperaba. Si cambió, se lanza AQUÍ, dentro de la misma
+                        // unidad transaccional, para que atomically revierta ESTE agregado (los anteriores ya confirmados se conservan).
+                        if (!stillActive()) throw IdentityChangedException()
                     }
                     written++
                 }

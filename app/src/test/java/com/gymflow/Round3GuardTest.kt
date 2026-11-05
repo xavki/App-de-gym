@@ -116,4 +116,34 @@ class Round3GuardTest {
         }
         assertTrue(text("ProgressScreens.kt").contains("HistoryFingerprint.of(history)"))
     }
+
+    // ─── Ronda 6 ───
+    private fun androidTest(rel: String) = File("src/androidTest/java/com/gymflow", rel).readText().replace("\r\n", "\n")
+
+    @Test fun `R5-01 el test Compose no importa assertDoesNotExist y conserva sus tres tests originales`() {
+        val t = androidTest("HomeProgressReloadTest.kt")
+        assertFalse("assertDoesNotExist es un miembro de SemanticsNodeInteraction, no una extension importable", t.contains("import androidx.compose.ui.test.assertDoesNotExist"))
+        for (name in listOf("homeShowsReplacedWorkoutWithSameCountAndSameId", "homeReflectsNameChangeAndDateChangeWithSameCount", "progressRecordsReflectWeightChangeWithSameCount"))
+            assertTrue("falta el test $name", t.contains("fun $name()"))
+        assertTrue(t.contains("muscleMapFollowsCustomExerciseGroupChangeWithSameCardinality") && t.contains("muscleMapFollowsGlobalCatalogGroupChangeWithSameCardinality"))
+        // sin coincidencias ambiguas por subcadena en las aserciones de contenido
+        assertFalse(Regex("""onNodeWithText\([^)]*substring\s*=\s*true""").containsMatchIn(t))
+    }
+
+    @Test fun `R5-02 la importacion heredada usa generacion de sesion y revalida tras write`() {
+        val vm = text("GymFlowViewModel.kt")
+        assertTrue(vm.contains("sessions.bump()") && vm.contains("sessions.capture(uid)") && vm.contains("sessions.isCurrent(token"))
+        assertTrue(vm.contains("auth.removeAuthStateListener(authListener)"))
+        val core = File("../syncCore/src/main/kotlin/com/gymflow/synccore/LegacyImport.kt").readText().replace("\r\n", "\n")
+        val tx = core.substringAfter("atomically {").substringBefore("written++")
+        assertTrue("write debe ir seguido de otra comprobacion dentro de la transaccion", tx.indexOf("write(item)") in 0 until tx.lastIndexOf("stillActive()"))
+    }
+
+    @Test fun `R5-03 el mapa muscular y el catalogo se invalidan por contenido`() {
+        assertFalse(text("MuscleMapScreen.kt").contains("catalog.size"))
+        val ps = text("ProgressScreens.kt")
+        assertFalse("el catalogo no se cachea por tamano", ps.contains("getCached().size"))
+        assertTrue(ps.contains("ExerciseRepository.catalogRevision"))
+        assertTrue(text("ExerciseRepository.kt").contains("var catalogRevision by mutableIntStateOf"))
+    }
 }

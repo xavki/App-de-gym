@@ -43,7 +43,7 @@ fun fmtDuration(seconds: Long): String {
     val h = seconds / 3600; val m = (seconds % 3600 + 30) / 60
     return if (h > 0) "$h h $m min" else "$m min"
 }
-private fun fmtDay(ms: Long) = SimpleDateFormat("EEE d MMM", es).format(ms).replaceFirstChar { it.uppercase() }
+fun fmtDay(ms: Long) = SimpleDateFormat("EEE d MMM", es).format(ms).replaceFirstChar { it.uppercase() }
 
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
@@ -218,7 +218,8 @@ fun ProgressTab(viewModel: GymFlowViewModel, onOpenPRBoard: () -> Unit, onExerci
     val historyKey = HistoryFingerprint.of(history)      // contenido, no tamaño (R4-03)
     val now = remember(historyKey) { System.currentTimeMillis() }
     // Grupo muscular de cada ejercicio: catálogo (y ejercicios personalizados)
-    val groups = remember(viewModel.customExercises.toList()) {
+    val catalogRevision = ExerciseRepository.catalogRevision      // estado observable: recompone y invalida al cambiar el catálogo
+    val groups = remember(viewModel.customExercises.toList(), catalogRevision) {
         ExerciseRepository.getCached().associate { it.name to ExerciseNamesEs.group(it.mainGroup) } +
             viewModel.customExercises.associate { it.name to it.mainGroup }
     }
@@ -324,7 +325,7 @@ fun ProgressTab(viewModel: GymFlowViewModel, onOpenPRBoard: () -> Unit, onExerci
             }
         }
         item {
-            val catalog = remember(viewModel.customExercises.toList(), ExerciseRepository.getCached().size) { muscleCatalog(ExerciseRepository.getCached(), viewModel.customExercises) }
+            val catalog = remember(viewModel.customExercises.toList(), catalogRevision) { muscleCatalog(ExerciseRepository.getCached(), viewModel.customExercises) }
             MuscleMapCard(history = history, catalog = catalog, contentKey = historyKey)
         }
     }

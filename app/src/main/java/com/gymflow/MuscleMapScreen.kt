@@ -64,7 +64,7 @@ private fun series(n: Int) = if (n == 1) "1 serie" else "$n series"
 
 @Composable
 fun MuscleMapCard(history: List<WorkoutSession>, catalog: Map<String, Pair<String, String>>, contentKey: Long) {
-    val activity = remember(contentKey, catalog.size) { MuscleActivity.compute(history, catalog) }
+    val activity = remember(contentKey, catalog) { MuscleActivity.compute(history, catalog) }      // catalog: igualdad por contenido (Map), no solo su tamaño
     val colors = MapColors(LocalPalette.current)
     // En horizontal la altura manda: las figuras no pasan de media pantalla
     val windowH = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }

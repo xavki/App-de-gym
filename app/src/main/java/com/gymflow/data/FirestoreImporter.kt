@@ -130,7 +130,8 @@ object FirestoreImporter {
                 stillActive = stillActive,
                 atomically = { block -> repo.inTransaction(block) },     // la cuenta y el propietario se revalidan DENTRO de esta transacción
                 onComplete = {
-                    // última revalidación ya hecha por runLegacyImport; la marca es por uid
+                    // runLegacyImport ya revalidó; se repite aquí, pegado a la escritura de la marca, y la marca es por uid
+                    if (!stillActive()) throw com.gymflow.synccore.IdentityChangedException()
                     prefs(context).edit().putBoolean(key, true).apply()
                     Log.i(TAG, "Importación desde Firestore completada")
                 },

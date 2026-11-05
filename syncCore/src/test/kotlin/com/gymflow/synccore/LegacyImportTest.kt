@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 
 /** Importación heredada: incremental, reintentable, sin duplicados y sin confundir colisiones entre cuentas. Datos sintéticos, sin Firebase. */
@@ -17,7 +18,8 @@ class LegacyImportTest {
         runLegacyImport(uid, items,
             ownerOf = { i -> db.rows[i.id]?.let { Owner.User(it) } ?: Owner.Absent },
             write = { i -> if (i.id == failOn) throw IllegalStateException("fallo inyectado"); db.rows[i.id] = uid; db.writes++ },
-            stillActive = active)
+            stillActive = active,
+            atomically = { block -> val snap = LinkedHashMap(db.rows); try { block() } catch (e: Throwable) { db.rows.clear(); db.rows.putAll(snap); throw e } })
 
     @Test fun `un fallo entre agregados conserva lo escrito y el reintento termina sin duplicar`() = runBlocking {
         val db = Db()
@@ -49,7 +51,7 @@ class LegacyImportTest {
 
     @Test fun `si la cuenta cambia a mitad no se escribe nada mas`() = runBlocking {
         val db = Db()
-        val r = run("A", db, active = { db.rows.size < 2 })      // la cuenta «cambia» tras escribir 2 agregados (no depende de cuántas comprobaciones haga el helper)
+        val r = run("A", db, active = { db.rows.size < 3 })      // la cuenta «cambia» al escribir el 3.º: ese se revierte, los 2 anteriores quedan confirmados
         assertEquals(2, db.rows.size); assertTrue(r.failure is IdentityChangedException); assertEquals(items[2], r.failedAt)
     }
 }
@@ -136,5 +138,96 @@ class LegacyImportIdentityTest {
         var done = false
         val r = runLegacyImport("A", two, ownerOf = { if (it == item) Owner.User("B") else Owner.Absent }, write = {}, stillActive = { true }, onComplete = { done = true })
         assertEquals(listOf(item), r.collisions); assertEquals(1, r.written); assertTrue(done)
+    }
+}
+
+/** R5-02: intercalaciones controladas (CompletableDeferred) con rollback verificable y el caso A→B→A. */
+class LegacyImportInterleavingTest {
+    private class Store { val rows = linkedMapOf<String, String>(); var rollbacks = 0 }
+
+    private fun atomicallyOn(st: Store): suspend (suspend () -> Unit) -> Unit = { block ->
+        val snap = LinkedHashMap(st.rows)
+        try { block() } catch (e: Throwable) { st.rows.clear(); st.rows.putAll(snap); st.rollbacks++; throw e }
+    }
+
+    private val a1 = LegacyItem(Tables.ROUTINES, uuid("i1"))
+    private val a2 = LegacyItem(Tables.ROUTINES, uuid("i2"))
+    private val ach = LegacyItem(Tables.ACHIEVEMENTS, uuid("iach"))
+
+    /** Reproducción de Codex: la cuenta cambia MIENTRAS write está suspendido; el agregado en curso debe revertirse. */
+    @Test fun `cambio mientras write esta suspendido revierte el agregado en curso y conserva los anteriores`() = runBlocking {
+        val st = Store(); val guard = SessionGuard(); val token = guard.capture("A")!!
+        val inside = kotlinx.coroutines.CompletableDeferred<Unit>(); val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val job = async {
+            runLegacyImport("A", listOf(a1, a2), ownerOf = { Owner.Absent },
+                write = { i -> st.rows[i.id] = "A"; if (i == a2) { inside.complete(Unit); release.await() } },    // a2 se suspende dentro de write
+                stillActive = { guard.isCurrent(token, active.get()) },
+                atomically = atomicallyOn(st))
+        }
+        inside.await(); active.set("B"); guard.bump(); release.complete(Unit)       // la sesión cambia con a2 ya escrito pero sin confirmar
+        val r = job.await()
+        assertEquals(setOf(a1.id), st.rows.keys, "a1 (confirmado antes) se conserva; a2 se revierte")
+        assertEquals(1, st.rollbacks); assertEquals(false, r.complete); assertEquals(a2, r.failedAt); assertTrue(r.failure is IdentityChangedException)
+        assertEquals(1, r.written)
+    }
+    private val active = java.util.concurrent.atomic.AtomicReference("A")
+    @kotlin.test.BeforeTest fun reset() { active.set("A") }
+
+    @Test fun `cambio mientras se escribe un logro revierte el logro y no marca completado`() = runBlocking {
+        val st = Store(); val guard = SessionGuard(); val token = guard.capture("A")!!; var done = false
+        val inside = kotlinx.coroutines.CompletableDeferred<Unit>(); val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val job = async {
+            runLegacyImport("A", listOf(a1, ach), ownerOf = { Owner.Absent },
+                write = { i -> st.rows[i.id] = "A"; if (i == ach) { inside.complete(Unit); release.await() } },
+                stillActive = { guard.isCurrent(token, active.get()) }, atomically = atomicallyOn(st), onComplete = { done = true })
+        }
+        inside.await(); active.set("B"); guard.bump(); release.complete(Unit)
+        val r = job.await()
+        assertEquals(setOf(a1.id), st.rows.keys); assertEquals(false, done); assertEquals(ach, r.failedAt); assertEquals(1, st.rollbacks)
+    }
+
+    @Test fun `cambio justo antes del commit (tras terminar write) revierte`() = runBlocking {
+        val st = Store(); var switchNow = false
+        val r = runLegacyImport("A", listOf(a1), ownerOf = { Owner.Absent },
+            write = { i -> st.rows[i.id] = "A"; switchNow = true },                // al terminar write la sesión ya no es la misma
+            stillActive = { !switchNow }, atomically = atomicallyOn(st))
+        assertTrue(st.rows.isEmpty()); assertEquals(1, st.rollbacks); assertTrue(r.failure is IdentityChangedException)
+    }
+
+    /** A→B→A: el UID vuelve a ser A, pero la generación cambió; con SessionGuard la operación se invalida. */
+    @Test fun `A a B a A se detecta por generacion aunque el uid coincida`() = runBlocking {
+        val st = Store(); val guard = SessionGuard(); val token = guard.capture("A")!!
+        val r = runLegacyImport("A", listOf(a1, a2), ownerOf = { Owner.Absent },
+            write = { i -> st.rows[i.id] = "A"; if (i == a1) { active.set("B"); guard.bump(); active.set("A"); guard.bump() } },
+            stillActive = { guard.isCurrent(token, active.get()) }, atomically = atomicallyOn(st))
+        assertEquals(true, active.get() == "A")                                    // el UID activo es A al final…
+        assertTrue(st.rows.isEmpty(), "…pero a1 se revirtió y a2 no se intentó")
+        assertEquals(a1, r.failedAt); assertTrue(r.failure is IdentityChangedException)
+    }
+
+    @Test fun `con comparar solo el uid A a B a A NO se detecta (por eso existe la generacion)`() = runBlocking {
+        val st = Store()
+        val r = runLegacyImport("A", listOf(a1, a2), ownerOf = { Owner.Absent },
+            write = { i -> st.rows[i.id] = "A"; if (i == a1) { active.set("B"); active.set("A") } },
+            stillActive = { active.get() == "A" }, atomically = atomicallyOn(st))
+        assertTrue(r.complete && st.rows.size == 2)      // documenta la limitación del chequeo solo por UID
+    }
+
+    @Test fun `SessionGuard token invalido tras cualquier cambio y valido sin cambios`() {
+        val g = SessionGuard(); val t = g.capture("A")!!
+        assertTrue(g.isCurrent(t, "A")); assertEquals(false, g.isCurrent(t, "B")); assertEquals(false, g.isCurrent(t, null))
+        g.bump(); assertEquals(false, g.isCurrent(t, "A")); assertTrue(g.isCurrent(g.capture("A")!!, "A"))
+        assertEquals(null, g.capture(null))
+    }
+
+    @Test fun `reintento tras fallo parcial por cambio de cuenta continua sin duplicar`() = runBlocking {
+        val st = Store(); var switched = true; var onA2 = false
+        val r1 = runLegacyImport("A", listOf(a1, a2), ownerOf = { onA2 = it == a2; st.rows[it.id]?.let { u -> Owner.User(u) } ?: Owner.Absent },
+            write = { i -> st.rows[i.id] = "A" }, stillActive = { !(switched && onA2) }, atomically = atomicallyOn(st))
+        assertEquals(setOf(a1.id), st.rows.keys); assertEquals(false, r1.complete)
+        switched = false
+        val r2 = runLegacyImport("A", listOf(a1, a2), ownerOf = { st.rows[it.id]?.let { u -> Owner.User(u) } ?: Owner.Absent },
+            write = { i -> st.rows[i.id] = "A" }, stillActive = { true }, atomically = atomicallyOn(st))
+        assertTrue(r2.complete); assertEquals(1, r2.alreadyImported); assertEquals(1, r2.written); assertEquals(2, st.rows.size)
     }
 }

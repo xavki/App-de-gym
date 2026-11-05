@@ -12,6 +12,7 @@ import com.gymflow.data.FirestoreImporter
 import com.gymflow.data.GymRepository
 import com.gymflow.sync.DataEvents
 import com.gymflow.synccore.ListPublisher
+import com.gymflow.synccore.SessionGuard
 import com.gymflow.sync.SyncManager
 import com.gymflow.sync.SyncState
 import kotlinx.coroutines.*
@@ -119,21 +120,33 @@ class GymFlowViewModel(
 
     private val gates = Gates()      // declarado antes de init: el listener de sesión puede llamar a clearData()
 
-    init {
-        auth.addAuthStateListener { firebaseAuth ->
-            val user = firebaseAuth.currentUser
-            if (user == null) {
-                clearData()
-            } else {
-                restoreDraft(user.uid)
-                viewModelScope.launch {
-                    savePendingFinishes(user.uid)   // entrenos finalizados que no llegaron a Room
-                    loadAll()   // lo local aparece al instante
-                    SyncManager.schedule(appContext)
-                    refreshPending()
-                }
+    /** Generación de sesión: cada cambio de autenticación la sube, para detectar A→B→A en operaciones largas (R5-02). */
+    private val sessions = SessionGuard()
+
+    // Listener con referencia propia: se retira en onCleared (si no, FirebaseAuth conserva el ViewModel descartado)
+    private val authListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        sessions.bump()
+        val user = firebaseAuth.currentUser
+        if (user == null) {
+            clearData()
+        } else {
+            restoreDraft(user.uid)
+            viewModelScope.launch {
+                savePendingFinishes(user.uid)   // entrenos finalizados que no llegaron a Room
+                loadAll()   // lo local aparece al instante
+                SyncManager.schedule(appContext)
+                refreshPending()
             }
         }
+    }
+
+    override fun onCleared() {
+        auth.removeAuthStateListener(authListener)
+        super.onCleared()
+    }
+
+    init {
+        auth.addAuthStateListener(authListener)
         // M-03: importar JSON, resolver un conflicto o incorporar este móvil cambian Room sin pasar por una descarga: se recargan las listas
         viewModelScope.launch {
             DataEvents.changed.collect {
@@ -162,9 +175,12 @@ class GymFlowViewModel(
     /** Se llama únicamente desde el botón + diálogo de confirmación de Perfil → Importar datos. */
     fun importLegacyFirestore() {
         val uid = auth.currentUser?.uid ?: return
+        val token = sessions.capture(uid) ?: return           // cuenta + generación de sesión de ESTE momento
         legacyImportState = "Importando…"
         viewModelScope.launch {
-            val out = FirestoreImporter.importUserDataWithConsent(appContext, repo, db, uid, FirestoreImporter.LegacyConsent.grant(uid)) { auth.currentUser?.uid == uid }
+            val out = FirestoreImporter.importUserDataWithConsent(appContext, repo, db, uid, FirestoreImporter.LegacyConsent.grant(uid)) {
+                sessions.isCurrent(token, auth.currentUser?.uid)       // UID Y generación: detecta también A→B→A
+            }
             loadAll()
             legacyImportState = when {
                 !out.complete -> "No se pudo completar. Lo que ya se había añadido se conserva (sin duplicados) y puedes reintentar para terminar."
