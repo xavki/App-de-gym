@@ -4,8 +4,7 @@ App de entrenamiento de fuerza gratuita, **offline-first** y **autoalojada** (si
 
 ## Descargar
 
-<!-- TODO: enlace a la release cuando exista -->
-APK disponible en Releases.
+[Descargar la última APK](https://github.com/xavki/App-de-gym/releases/latest)
 
 ## Capturas
 
