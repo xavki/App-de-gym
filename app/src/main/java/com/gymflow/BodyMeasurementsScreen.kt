@@ -124,7 +124,7 @@ fun BodyMeasurementsScreen(
 private fun CurrentStatsCard(m: BodyMeasurement) {
     val sdf = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -197,7 +197,7 @@ private fun CurrentStatsCard(m: BodyMeasurement) {
 @Composable
 private fun BigStatCard(value: String, label: String, emoji: String, modifier: Modifier = Modifier) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF152A2A)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
         shape = RoundedCornerShape(14.dp),
         modifier = modifier
     ) {
@@ -216,7 +216,7 @@ private fun BigStatCard(value: String, label: String, emoji: String, modifier: M
 @Composable
 private fun EmptyMeasurementsHint(onAdd: () -> Unit) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onAdd)
     ) {
@@ -236,6 +236,7 @@ private fun EmptyMeasurementsHint(onAdd: () -> Unit) {
 // ── Gráfica de peso ────────────────────────────────────────────────────────────
 @Composable
 private fun WeightLineChart(measurements: List<BodyMeasurement>) {
+    val pal = LocalPalette.current
     val values = measurements.filter { it.weight > 0 }.map { it.weight.toFloat() }
     if (values.size < 2) return
 
@@ -251,7 +252,7 @@ private fun WeightLineChart(measurements: List<BodyMeasurement>) {
     val progress by animProgress.asState()
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1A1A)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -280,7 +281,7 @@ private fun WeightLineChart(measurements: List<BodyMeasurement>) {
                 // Draw line
                 for (i in 0 until (pts.size - 1).coerceAtMost((pts.size * progress).toInt())) {
                     drawLine(
-                        color = AccentCyan,
+                        color = pal.accent,
                         start = androidx.compose.ui.geometry.Offset(pts[i].first, pts[i].second),
                         end   = androidx.compose.ui.geometry.Offset(pts[i + 1].first, pts[i + 1].second),
                         strokeWidth = 3.dp.toPx(),
@@ -290,7 +291,7 @@ private fun WeightLineChart(measurements: List<BodyMeasurement>) {
                 // Draw dots
                 pts.forEachIndexed { i, (x, y) ->
                     if (i <= (pts.size * progress).toInt()) {
-                        drawCircle(color = AccentCyan, radius = 5.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x, y))
+                        drawCircle(color = pal.accent, radius = 5.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x, y))
                     }
                 }
             }
@@ -308,7 +309,7 @@ private fun WeightLineChart(measurements: List<BodyMeasurement>) {
 private fun MeasurementCard(measurement: BodyMeasurement, dateStr: String, onDelete: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A1414)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }
     ) {
@@ -347,7 +348,7 @@ fun AddMeasurementDialog(
     var thigh   by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(24.dp), color = Color(0xFF0D1A1A)) {
+        Surface(shape = RoundedCornerShape(24.dp), color = SurfaceDark) {
             LazyColumn(
                 modifier = Modifier.padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -360,7 +361,7 @@ fun AddMeasurementDialog(
                         fontSize = 20.sp
                     )
                     Spacer(Modifier.height(4.dp))
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                    HorizontalDivider(color = TextPrimary.copy(alpha = 0.06f))
                 }
 
                 // Peso y % grasa
@@ -400,7 +401,7 @@ fun AddMeasurementDialog(
                             onClick = onDismiss,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(14.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderStrong)
                         ) { Text(stringResource(R.string.schedule_cancel), color = TextSecondary) }
 
                         Button(
@@ -417,7 +418,7 @@ fun AddMeasurementDialog(
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = Color.Black)
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = OnAccent)
                         ) { Text(stringResource(R.string.schedule_save), fontWeight = FontWeight.Bold) }
                     }
                 }
@@ -444,7 +445,7 @@ private fun MeasureField(
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = AccentCyan,
-            unfocusedBorderColor = Color(0xFF1A2A2A),
+            unfocusedBorderColor = SurfaceAlt,
             focusedTextColor = TextPrimary,
             unfocusedTextColor = TextPrimary,
             focusedLabelColor = AccentCyan,

@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "exportedAt": "2026-09-28T15:50:16Z",
+  "userId": "user-1",
+  "units": {
+    "weight": "kg",
+    "length": "cm",
+    "time": "s"
+  },
+  "workouts": [
+    {
+      "id": "59eb4793-1c2b-4401-8949-6e1c15497a2a",
+      "routineId": null,
+      "name": "Push, heavy",
+      "startedAt": "2026-09-28T15:50:16Z",
+      "durationSeconds": 0,
+      "bodyweightKg": null,
+      "notes": "",
+      "updatedAt": "2026-09-28T15:50:16Z",
+      "exercises": [
+        {
+          "id": "3b144428-4e5c-3d98-8a1a-f4e155d69710",
+          "exerciseId": "87766a20-93bc-403b-a7d3-b5b66d3ab9e1",
+          "name": "Bench Press",
+          "mainGroup": "Pecho",
+          "position": 0,
+          "notes": "",
+          "supersetGroup": null,
+          "sets": [
+            {
+              "id": "1bd3cc74-39a6-34f9-8299-63b7299669fa",
+              "position": 0,
+              "type": "NORMAL",
+              "weightKg": 60.0,
+              "reps": 10,
+              "timeSeconds": 0,
+              "rpe": 9.0,
+              "completed": true
+            },
+            {
+              "id": "72bd11e9-0a8b-3e0a-b2fd-7fd176601e6c",
+              "position": 1,
+              "type": "NORMAL",
+              "weightKg": 70.0,
+              "reps": 8,
+              "timeSeconds": 0,
+              "rpe": null,
+              "completed": true
+            }
+          ]
+        },
+        {
+          "id": "d0ef8fe2-98ca-34f9-b8b5-21649f93412b",
+          "exerciseId": null,
+          "name": "Overhead Press",
+          "mainGroup": null,
+          "position": 1,
+          "notes": "",
+          "supersetGroup": null,
+          "sets": [
+            {
+              "id": "14da944b-aefc-3915-84a2-4350bd577b3b",
+              "position": 0,
+              "type": "NORMAL",
+              "weightKg": 40.0,
+              "reps": 10,
+              "timeSeconds": 0,
+              "rpe": null,
+              "completed": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "routines": [],
+  "bodyMeasurements": [],
+  "customExercises": [
+    {
+      "id": "87766a20-93bc-403b-a7d3-b5b66d3ab9e1",
+      "name": "Bench Press",
+      "mainGroup": "Pecho",
+      "musclesUsed": "",
+      "equipment": "",
+      "notes": ""
+    }
+  ],
+  "achievements": []
+}

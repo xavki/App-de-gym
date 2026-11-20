@@ -1,0 +1,3 @@
+# Los esquemas de Room exportados son artefactos con hash auténtico (SHA-256 documentado en app/schemas/README.md):
+# nunca deben convertirse a CRLF al hacer checkout en Windows (core.autocrlf=true).
+app/schemas/**/*.json text eol=lf

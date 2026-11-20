@@ -51,7 +51,8 @@ data class ExerciseSet(
     @get:PropertyName("isCompleted")
     @set:PropertyName("isCompleted")
     var isCompleted: Boolean = false,
-    var setType: String = SetType.NORMAL  // NORMAL | WARMUP | DROP_SET | FAILURE
+    var setType: String = SetType.NORMAL,  // NORMAL | WARMUP | DROP_SET | FAILURE
+    var rpe: Double? = null                // Esfuerzo percibido 1-10 (opcional)
 )
 
 data class ExerciseHistoryEntry(

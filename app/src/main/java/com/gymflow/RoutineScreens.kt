@@ -74,7 +74,7 @@ fun EditRoutineScreen(
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = AccentCyan,
-                    unfocusedBorderColor = Color.DarkGray,
+                    unfocusedBorderColor = BorderStrong,
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary,
                     focusedLabelColor = AccentCyan
@@ -122,7 +122,7 @@ fun EditRoutineScreen(
                                 ) {
                                     Icon(
                                         Icons.Default.KeyboardArrowUp, null, 
-                                        tint = if (index > 0) AccentCyan else Color.DarkGray,
+                                        tint = if (index > 0) AccentCyan else BorderStrong,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -138,7 +138,7 @@ fun EditRoutineScreen(
                                 ) {
                                     Icon(
                                         Icons.Default.KeyboardArrowDown, null, 
-                                        tint = if (index < exercises.size - 1) AccentCyan else Color.DarkGray,
+                                        tint = if (index < exercises.size - 1) AccentCyan else BorderStrong,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -147,7 +147,7 @@ fun EditRoutineScreen(
                             Spacer(Modifier.width(4.dp))
                             
                             val defn = ExerciseRepository.getCached().find { it.name == ex.exerciseName }
-                            Text(defn?.nameEs ?: ex.exerciseName, color = TextPrimary, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
+                            Text(ExerciseNamesEs.display(ex.exerciseName), color = TextPrimary, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
                             Text(
                                 "${ex.sets.size}s",
                                 color = TextSecondary,
@@ -219,7 +219,7 @@ fun RoutineDetailScreen(
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             val defn = ExerciseRepository.getCached().find { it.name == ex.exerciseName }
-                            Text(defn?.nameEs ?: ex.exerciseName, color = TextPrimary, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
+                            Text(ExerciseNamesEs.display(ex.exerciseName), color = TextPrimary, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
                             IconButton(onClick = { onInfoClick(ex) }) {
                                 Icon(Icons.Outlined.Info, null, tint = TextSecondary)
                             }

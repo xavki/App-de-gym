@@ -3,6 +3,20 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'   // Compose compiler plugin (Kotlin 2.0+)
     id 'com.google.gms.google-services'
+    id 'com.google.devtools.ksp'
+    id 'org.jetbrains.kotlin.plugin.serialization'
+}
+
+// URL del servidor propio (opcional): en local.properties → gymflow.syncUrl=https://tu-dominio
+// También se puede cambiar desde la app (Perfil → Sincronización).
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) localPropsFile.withInputStream { localProps.load(it) }
+def syncUrl = localProps.getProperty('gymflow.syncUrl', '')
+
+ksp {
+    // Guarda el esquema de cada versión de la BD (necesario para migraciones futuras)
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 android {
@@ -13,13 +27,17 @@ android {
         applicationId "com.gymflow"
         minSdk 26
         targetSdk 35                            // ← actualizado
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary true
         }
+        buildConfigField "String", "SYNC_URL", "\"${syncUrl}\""
+        // App solo en español: no se empaquetan otros idiomas (values-en mostraba textos en inglés
+        // cuando el sistema está en inglés y el contexto no pasa por MainActivity)
+        resourceConfigurations += ["es"]
     }
 
     buildTypes {
@@ -37,6 +55,11 @@ android {
     }
     buildFeatures {
         compose true
+        buildConfig true
+    }
+    sourceSets {
+        // Esquemas exportados de Room: los usa el test de migraciones
+        androidTest.assets.srcDirs += files("$projectDir/schemas")
     }
     // composeOptions ya NO hace falta con Kotlin 2.0+ (el compilador viene en el plugin)
 }
@@ -68,6 +91,7 @@ dependencies {
     // Room
     implementation "androidx.room:room-runtime:2.6.1"
     implementation "androidx.room:room-ktx:2.6.1"
+    ksp "androidx.room:room-compiler:2.6.1"
 
     // Gson
     implementation 'com.google.code.gson:gson:2.10.1'
@@ -75,4 +99,26 @@ dependencies {
     // Coil
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("io.coil-kt:coil-gif:2.6.0")
+
+    // Núcleo de importación y sincronización (Kotlin/JVM, probado en la JVM)
+    implementation project(':syncCore')
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0'
+
+    // Sincronización con el servidor propio
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'androidx.work:work-runtime-ktx:2.10.0'
+
+    // Tests en el PC (JVM): formato de sincronización
+    testImplementation 'junit:junit:4.13.2'
+
+    // Tests en dispositivo (base de datos Room)
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1'
+    androidTestImplementation 'androidx.room:room-testing:2.6.1'
+    // Recorrido visual en emulador (solo tests; no va en la app)
+    androidTestImplementation platform('androidx.compose:compose-bom:2025.04.01')
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }

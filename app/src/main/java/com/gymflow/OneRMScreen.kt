@@ -47,7 +47,7 @@ fun OneRMDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFF0D1A1A)
+            color = SurfaceDark
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
@@ -65,12 +65,12 @@ fun OneRMDialog(
                             fontSize = 20.sp
                         )
                         if (exerciseName.isNotEmpty()) {
-                            Text(exerciseName, color = AccentCyan, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Text(ExerciseNamesEs.display(exerciseName), color = AccentCyan, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
 
-                HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                HorizontalDivider(color = TextPrimary.copy(alpha = 0.06f))
 
                 // ── Inputs ───────────────────────────────────────────────────
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -101,7 +101,7 @@ fun OneRMDialog(
                 // ── Resultado principal ──────────────────────────────────────
                 if (avg > 0) {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF152A2A)),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -128,7 +128,7 @@ fun OneRMDialog(
                                 val diffStr = if (diff >= 0) "+${diff.roundToInt()} kg" else "${diff.roundToInt()} kg"
                                 Text(
                                     "${stringResource(R.string.orm_vs_best)} $diffStr",
-                                    color = if (diff >= 0) Color(0xFF4CAF50) else AccentRed,
+                                    color = if (diff >= 0) Success else AccentRed,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -138,7 +138,7 @@ fun OneRMDialog(
 
                     // ── Tabla de porcentajes ─────────────────────────────────
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A1A1A)),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -197,7 +197,7 @@ fun OneRMDialog(
 @Composable
 private fun OneRMFormulaChip(name: String, value: Double) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A2A2A)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
         shape = RoundedCornerShape(10.dp),
         modifier = Modifier.wrapContentWidth()
     ) {
@@ -214,7 +214,7 @@ private fun OneRMFormulaChip(name: String, value: Double) {
 @Composable
 private fun ormFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = AccentCyan,
-    unfocusedBorderColor = Color(0xFF1A2A2A),
+    unfocusedBorderColor = SurfaceAlt,
     focusedTextColor = TextPrimary,
     unfocusedTextColor = TextPrimary,
     focusedLabelColor = AccentCyan,

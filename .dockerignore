@@ -1,0 +1,8 @@
+# Solo panel/ y server/ entran en la imagen del servidor
+*
+!panel/
+!server/
+panel/node_modules
+panel/dist
+server/build
+server/.gradle

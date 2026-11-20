@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fondo del tema claro (predeterminado): ventana de arranque sin destello negro -->
+    <color name="gf_background">#F7F9FC</color>
+    <!-- Fondo del icono de la app (capa "background" del icono adaptativo); mismo tono que el fondo del tema oscuro -->
+    <color name="ic_launcher_background">#101827</color>
+</resources>

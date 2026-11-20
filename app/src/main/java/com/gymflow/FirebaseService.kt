@@ -20,12 +20,4 @@ object FirebaseService {
         )
         return db.collection("users").document(uid).set(userData)
     }
-
-    fun getRoutines(uid: String) = db.collection("users").document(uid).collection("routines").get()
-
-    fun saveRoutine(uid: String, routine: WorkoutSession) = 
-        db.collection("users").document(uid).collection("routines").document(routine.id).set(routine)
-
-    fun deleteRoutine(uid: String, routineId: String) = 
-        db.collection("users").document(uid).collection("routines").document(routineId).delete()
 }

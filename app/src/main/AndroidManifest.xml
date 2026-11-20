@@ -12,14 +12,15 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@android:drawable/ic_menu_myplaces"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:roundIcon="@android:drawable/ic_menu_myplaces"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.GymFlow">
 
         <activity
             android:name=".MainActivity"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -30,6 +31,11 @@
         <!-- Receiver para alarmas de notificación -->
         <receiver
             android:name=".NotificationReceiver"
+            android:exported="false"/>
+
+        <!-- Fin del descanso con la app en segundo plano -->
+        <receiver
+            android:name=".RestAlarmReceiver"
             android:exported="false"/>
 
         <!-- Receiver para reprogramar alarmas tras reinicio -->

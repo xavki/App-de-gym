@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Tema base oscuro para splash y barras del sistema -->
+    <!-- Tema base claro (el predeterminado) para la ventana de arranque y las barras del sistema -->
     <style name="Theme.GymFlow" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
-        <item name="android:statusBarColor">@android:color/black</item>
-        <item name="android:navigationBarColor">@android:color/black</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/gf_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 
     <!-- ═══ Strings ES (idioma por defecto) ═══ -->
@@ -58,7 +58,7 @@
 
     <!-- Rest timer -->
     <string name="rest_title">Descanso</string>
-    <string name="rest_reset">Reiniciar a 1:00</string>
+    <string name="rest_reset">Reiniciar</string>
     <string name="rest_close">Cerrar</string>
 
     <!-- Summary -->
@@ -248,7 +248,7 @@
     <string name="body_title">Medidas corporales</string>
     <string name="body_current">MEDIDAS ACTUALES</string>
     <string name="body_weight">Peso</string>
-    <string name="body_fat">% Grasa</string>
+    <string name="body_fat" formatted="false">% Grasa</string>
     <string name="body_chest">Pecho</string>
     <string name="body_waist">Cintura</string>
     <string name="body_hips">Cadera</string>

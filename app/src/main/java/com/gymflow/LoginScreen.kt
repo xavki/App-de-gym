@@ -73,13 +73,14 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .systemBarsPadding()
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF000000),
-                        Color(0xFF041515),
-                        Color(0xFF082020),
-                        Color(0xFF000000)
+                        BackgroundDark,
+                        BackgroundDark,
+                        SurfaceAlt,
+                        BackgroundDark
                     )
                 )
             )
@@ -132,7 +133,7 @@ fun LoginScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF111111), RoundedCornerShape(16.dp))
+                    .background(SurfaceDark, RoundedCornerShape(16.dp))
                     .padding(4.dp)
             ) {
                 Box(
@@ -225,7 +226,7 @@ fun LoginScreen(
                 Checkbox(
                     checked = rememberMe || isRegistering,
                     onCheckedChange = { if(!isRegistering) rememberMe = it },
-                    colors = CheckboxDefaults.colors(checkedColor = AccentCyan, uncheckedColor = Color.DarkGray)
+                    colors = CheckboxDefaults.colors(checkedColor = AccentCyan, uncheckedColor = BorderStrong)
                 )
                 Text(stringResource(R.string.login_remember), color = TextSecondary, fontSize = 13.sp)
             }
@@ -271,12 +272,12 @@ fun LoginScreen(
                 enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AccentCyan,
-                    contentColor = Color.Black,
+                    contentColor = OnAccent,
                     disabledContainerColor = AccentCyan.copy(alpha = 0.4f)
                 )
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(color = Color.Black, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+                    CircularProgressIndicator(color = OnAccent, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(12.dp))
                 }
                 Text(
@@ -293,9 +294,9 @@ fun LoginScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Color.DarkGray.copy(alpha = 0.5f))
+                HorizontalDivider(modifier = Modifier.weight(1f), color = BorderStrong.copy(alpha = 0.5f))
                 Text("  ${stringResource(R.string.login_or)}  ", color = TextSecondary, fontSize = 12.sp)
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Color.DarkGray.copy(alpha = 0.5f))
+                HorizontalDivider(modifier = Modifier.weight(1f), color = BorderStrong.copy(alpha = 0.5f))
             }
 
             Spacer(Modifier.height(16.dp))
@@ -305,12 +306,12 @@ fun LoginScreen(
                 onClick = onGoogleSignIn,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(18.dp),
-                border = BorderStroke(1.dp, Color(0xFF333333))
+                border = BorderStroke(1.dp, BorderStrong)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Login, null, tint = Color.White)
+                    Icon(Icons.Default.Login, null, tint = TextPrimary)
                     Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.login_google), color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.login_google), color = TextPrimary, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -320,12 +321,12 @@ fun LoginScreen(
 @Composable
 private fun loginFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = AccentCyan,
-    unfocusedBorderColor = Color(0xFF2A2A2A),
+    unfocusedBorderColor = Border,
     cursorColor = AccentCyan,
     focusedTextColor = AccentWhite,
     unfocusedTextColor = AccentWhite,
     focusedLabelColor = AccentCyan,
     unfocusedLabelColor = TextSecondary,
-    focusedContainerColor = Color(0xFF0A0A0A),
-    unfocusedContainerColor = Color(0xFF0A0A0A)
+    focusedContainerColor = SurfaceDark,
+    unfocusedContainerColor = SurfaceDark
 )
